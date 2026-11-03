@@ -9,10 +9,10 @@
 <meta name="apple-mobile-web-app-title" content="リエラクエスト">
 <title>リエラクエスト</title>
 <link rel="manifest" href="manifest.json">
-<link rel="icon" href="img/icon-192.png?v=2026.11.03-10">
-<link rel="apple-touch-icon" href="img/icon-180.png?v=2026.11.03-10">
+<link rel="icon" href="img/icon-192.png?v=2026.11.03-13">
+<link rel="apple-touch-icon" href="img/icon-180.png?v=2026.11.03-13">
 <link href="https://fonts.googleapis.com/css2?family=DotGothic16&family=M+PLUS+Rounded+1c:wght@400;700;800&display=swap" rel="stylesheet" media="print" onload="this.media='all'">
-<link rel="stylesheet" href="style.css?v=2026.11.03-10">
+<link rel="stylesheet" href="style.css?v=2026.11.03-13">
 </head>
 <body>
 <div id="boot">読み込み中…</div>
@@ -61,6 +61,7 @@
   <header class="bar">
     <button id="ed-back" class="icon-btn" aria-label="もどる">‹</button>
     <div class="bar-mid"><div class="bar-title">モンスターを作る</div><div id="ed-sub" class="bar-sub"></div></div>
+    <button id="ed-party" class="btn small ghost bar-btn">パーティー</button>
   </header>
   <div class="scroll">
     <div class="ed-top">
@@ -72,7 +73,7 @@
     <div class="ed-row"><div class="label">形</div><div id="ed-shape" class="chips"></div></div>
     <div class="ed-row"><div class="label">属性（色）</div><div id="ed-elem" class="chips"></div></div>
     <details open class="ed-sec"><summary>能力</summary><div id="ed-stats"></div></details>
-    <details open class="ed-sec"><summary>効き目（弱点と耐性）</summary><p class="note">弱点を作ると魔力が少し戻ってきます（最大9）。</p><div id="ed-res"></div></details>
+    <details open class="ed-sec"><summary>効き目（弱点と耐性）</summary><p class="note">弱点を作ると魔力が少し戻ってきます（最大9）。「得意○人」はその攻撃が得意なLiella!の人数（休みを除く）。</p><button id="ed-party2" class="btn small ghost">パーティーの得意を見る</button><div id="ed-res"></div></details>
     <details open class="ed-sec"><summary>特性</summary><div id="ed-traits"></div></details>
     <div style="height:90px"></div>
   </div>
@@ -99,6 +100,6 @@
 <div id="sheet" class="sheet" hidden><div class="sheet-body"><button id="sheet-close" class="icon-btn sheet-x">×</button><div id="sheet-content"></div></div></div>
 <div id="toast" class="toast"></div>
 
-<script type="module" src="js/main.js?v=2026.11.03-10"></script>
+<script type="module" src="js/main.js?v=2026.11.03-13"></script>
 </body>
 </html>

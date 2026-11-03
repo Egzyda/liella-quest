@@ -1,9 +1,9 @@
 // 画面と操作：タイトル・魔王の玉座・モンスター作り・作戦会議と戦闘の再生
-import { IDS, CHARS, ELEMS, ELEM, WEAPONS, WEAPON, KEYS, keyName, STATS, STAT, SHAPES, TRAITS, STAGES, RES_MULT } from './data.js?v=2026.11.03-10';
-import * as E from './engine.js?v=2026.11.03-10';
-import { monsterSVG } from './monster.js?v=2026.11.03-10';
-import { AI, OLLAMA_MODEL } from './llm.js?v=2026.11.03-10';
-import { VERSION } from './version.js?v=2026.11.03-10';
+import { IDS, CHARS, ELEMS, ELEM, WEAPONS, WEAPON, KEYS, keyName, STATS, STAT, SHAPES, TRAITS, STAGES, RES_MULT } from './data.js?v=2026.11.03-13';
+import * as E from './engine.js?v=2026.11.03-13';
+import { monsterSVG } from './monster.js?v=2026.11.03-13';
+import { AI, OLLAMA_MODEL } from './llm.js?v=2026.11.03-13';
+import { VERSION } from './version.js?v=2026.11.03-13';
 
 const $ = id => document.getElementById(id);
 const h = (tag, attrs = {}, html = '') => { const e = document.createElement(tag); for (const [k, v] of Object.entries(attrs)) { if (k === 'on') for (const [ev, fn] of Object.entries(v)) e.addEventListener(ev, fn); else if (k === 'style') e.style.cssText = v; else e.setAttribute(k, v); } if (html) e.innerHTML = html; return e; };
@@ -82,6 +82,7 @@ const HELP = `<div class="help"><h3>遊び方</h3>
 <p><b>モンスター作り</b>：能力（体力・攻撃・防御…）、効き目（弱点と耐性）、特性（再生・飛行…）を決める。能力は1ポイント＝魔力1で、どの能力も1ポイントでだいたい同じくらい強くなります（0〜15）。ただし防御は、片方だけ上げるとパーティーがもう片方（物理⇔魔法）で攻めてくるので、両方上げると効きます。弱点を作ると魔力が少し戻ります（最大9）。名前は「おまかせ」で形・属性・能力から自動で付きます。</p>
 <p><b>見た目と言い伝え</b>：パーティーは見た目（形と色）で判断します。火の色なら「水が効くはず」と思いこむので、そこを無効にしておくと引っかかります。同じ見た目で中身を変えると、前の記憶が通じず混乱します。</p>
 <p><b>パーティー</b>：11人それぞれ武器や属性の得意度（0〜10）、性格がちがいます。使った武器や魔法は少しずつ上達します。戦った人は疲れ、倒れた人は次の戦いを休みます。控えも経験値を半分もらえます。</p>
+<p><b>パーティーの一覧</b>：玉座のパーティーを「一覧表」「攻撃ごと」に切りかえると、11人の得意が一目でわかります。モンスター作りの「パーティー」ボタンからも開けます。得意な子が多い攻撃（主力）を効かなくすると困り、少ない攻撃（手薄）は弱点にしても突かれにくいです。</p>
 <p><b>図鑑</b>：パーティーが見て覚えたこと。会心の一撃を弱点と勘ちがいすることもあります（理屈っぽい人は割り引いて考える）。</p>
 <p><b>頭脳</b>：「ふつう」は性格と数字で考えます。クラウドAI・PCのAIは、作戦会議（出撃メンバーと作戦）と、戦闘中の大事な場面（ピンチ・予想外のこと）でAIが判断します。PCのAIは回数制限がないので、3ターンごとの見直しもAIがします（1回の戦闘で最大6回）。セリフはどのモードでも、キャラごとに用意したものです。</p></div>`;
 
@@ -119,13 +120,72 @@ function hub() {
 $('hub-title').onclick = () => title();
 
 function tiredDots(n) { return `<span class="tired">${[0, 1, 2].map(i => `<i class="${i < n ? 'on' : ''}"></i>`).join('')}</span>`; }
-function renderParty() {
-  const el = $('tab-party');
-  el.innerHTML = `<div class="pgrid">${IDS.map(id => { const P = G.party[id], C = CHARS[id]; return `<div class="pc" data-id="${id}" style="--c:${C.color}">${P.hurt ? '<span class="tag">ケガ</span>' : ''}<img src="${face(id)}" alt=""><div class="nm">${C.name}</div><div class="lv">Lv${P.lv} ${tiredDots(P.tired)}</div><div class="role">${C.role}</div></div>`; }).join('')}</div>
-    <p class="note">タップでくわしく。オレンジの点は疲れ（3つで限界）。</p>`;
-  for (const c of el.querySelectorAll('.pc')) c.onclick = () => charSheet(c.dataset.id);
+// ---------------- パーティーの見方（カード・一覧表・攻撃ごと） ----------------
+// 得意＝得意度6以上。休み（ケガ）の子は数えない
+const GOOD = 6;
+const SKILLS = [['heal', '回復'], ['song', '歌'], ['guard', 'かばう'], ['scan', '分析']];
+const ACOLS = [...WEAPONS.map(k => [k, WEAPON[k].name, 'w']), ...ELEMS.map(k => [k, ELEM[k].name, 'e']), ...SKILLS.map(([k, n]) => [k, n, 's'])];
+const baseApt = (id, k) => { const C = CHARS[id]; return WEAPON[k] ? C.w[k] : ELEM[k] ? C.e[k] : C.s[k] || 0; };
+// その攻撃が得意な子（休みを除く）。主力＝3人以上、手薄＝1人以下
+function keyInfo(k) {
+  const list = E.available(G).map(id => ({ id, a: E.apt(G, id, k) })).sort((a, b) => b.a - a.a);
+  const good = list.filter(x => x.a >= GOOD);
+  return { list, good, tag: good.length >= 3 ? 'main' : good.length <= 1 ? 'thin' : '' };
 }
-function charSheet(id) {
+const TAG = { main: '主力', thin: '手薄' };
+let psort = null;
+function partyView(el, inSheet) {
+  const view = set.pview || (inSheet ? 'table' : 'card');
+  const v = inSheet && view === 'card' ? 'table' : view;
+  const tabs = (inSheet ? [['table', '一覧表'], ['keys', '攻撃ごと']] : [['card', 'カード'], ['table', '一覧表'], ['keys', '攻撃ごと']]);
+  let html = `<div class="seg pview">${tabs.map(([k, n]) => `<button data-v="${k}" class="${v === k ? 'on' : ''}">${n}</button>`).join('')}</div>`;
+  if (v === 'card') {
+    html += `<div class="pgrid">${IDS.map(id => { const P = G.party[id], C = CHARS[id]; return `<div class="pc" data-id="${id}" style="--c:${C.color}">${P.hurt ? '<span class="tag">ケガ</span>' : ''}<img src="${face(id)}" alt=""><div class="nm">${C.name}</div><div class="lv">Lv${P.lv} ${tiredDots(P.tired)}</div><div class="role">${C.role}</div></div>`; }).join('')}</div>
+      <p class="note">タップでくわしく。オレンジの点は疲れ（3つで限界）。</p>`;
+  } else if (v === 'table') html += partyTable();
+  else html += keyList();
+  el.innerHTML = html;
+  for (const b of el.querySelectorAll('.pview button')) b.onclick = () => { set.pview = b.dataset.v; save(); partyView(el, inSheet); };
+  for (const c of el.querySelectorAll('[data-id]')) c.onclick = () => charSheet(c.dataset.id, inSheet ? () => openParty() : null);
+  for (const th of el.querySelectorAll('th[data-k]')) th.onclick = () => { psort = psort === th.dataset.k ? null : th.dataset.k; partyView(el, inSheet); };
+  if (v === 'table' && el.dataset.sx) el.querySelector('.ptable-wrap').scrollLeft = +el.dataset.sx;
+  const w = el.querySelector('.ptable-wrap'); if (w) w.onscroll = () => { el.dataset.sx = w.scrollLeft; };
+}
+function partyTable() {
+  const st = Object.fromEntries(IDS.map(id => [id, E.charStats(G, id)]));
+  const val = (id, k) => k === 'lv' ? G.party[id].lv : k === 'atk' ? st[id].atk : k === 'mag' ? st[id].mag : E.apt(G, id, k);
+  let rows = IDS.slice();
+  if (psort) rows.sort((a, b) => (G.party[a].hurt - G.party[b].hurt) || (val(b, psort) - val(a, psort)));
+  const th = (k, n, cls = '') => `<th data-k="${k}" class="${cls} ${psort === k ? 'on' : ''}">${n}${psort === k ? '<i>▼</i>' : ''}</th>`;
+  const head = `<tr><th class="nm">メンバー</th>${th('lv', 'Lv')}${th('atk', '力', 'g0')}${th('mag', '魔力')}${ACOLS.map(([k, n, g], i) => th(k, n, (i === 0 || i === 4 || i === 10 ? 'g0 ' : '') + (g === 'e' ? 'el' : ''))).join('')}</tr>`;
+  const body = rows.map(id => {
+    const P = G.party[id], C = CHARS[id];
+    return `<tr data-id="${id}" class="${P.hurt ? 'off' : ''}"><th class="nm" style="--c:${C.color}"><img src="${face(id)}" alt=""><span class="${C.name.length >= 5 ? 'long' : ''}">${C.name}${P.hurt ? '<em>休み</em>' : P.tired ? `<em class="t">疲れ${P.tired}</em>` : ''}</span></th>
+      <td>${P.lv}</td><td class="g0">${Math.round(st[id].atk)}</td><td>${Math.round(st[id].mag)}</td>
+      ${ACOLS.map(([k], i) => { const a = E.apt(G, id, k), up = a - baseApt(id, k); return `<td class="ap ${a >= GOOD ? 'hi' : ''} ${i === 0 || i === 4 || i === 10 ? 'g0' : ''}" style="--a:${Math.min(1, a / 10).toFixed(2)}">${a}${up > 0 ? `<sup>+${up}</sup>` : ''}</td>`; }).join('')}</tr>`;
+  }).join('');
+  const infos = ACOLS.map(([k]) => keyInfo(k));
+  const sum1 = `<tr class="sum"><th class="nm">一番手</th><td colspan="3"></td>${infos.map((x, i) => `<td class="${i === 0 || i === 4 || i === 10 ? 'g0' : ''}">${x.list[0] ? `<img src="${face(x.list[0].id)}" alt="${CHARS[x.list[0].id].name}">` : ''}</td>`).join('')}</tr>`;
+  const sum2 = `<tr class="sum"><th class="nm">得意な子</th><td colspan="3"></td>${infos.map((x, i) => `<td class="${x.tag} ${i === 0 || i === 4 || i === 10 ? 'g0' : ''}">${x.good.length}${x.tag ? `<small>${TAG[x.tag]}</small>` : ''}</td>`).join('')}</tr>`;
+  return `<div class="ptable-wrap"><table class="ptable"><thead>${head}</thead><tbody>${body}${sum1}${sum2}</tbody></table></div>
+    <p class="note">数字は得意度（10がふつうの最高。<b class="hi-t">6以上</b>を「得意」）。<sup>+1</sup>は使いこんで上達したぶん。表は横にすべらせて見られます。見出しをタップでその順に並べかえ、名前をタップでくわしく。<br><span class="main-t">主力</span>＝得意な子が3人以上（効かなくすると困る）、<span class="thin-t">手薄</span>＝1人以下（弱点にしても突かれにくい）。休みの子は数えません。</p>`;
+}
+function keyList() {
+  const items = ACOLS.map(([k, n, g]) => {
+    const x = keyInfo(k);
+    const top = x.list.slice(0, 3).map(y => `<span class="kp ${y.a >= GOOD ? 'hi' : ''}" data-id="${y.id}"><img src="${face(y.id)}" alt="">${CHARS[y.id].name}<b>${y.a}</b></span>`).join('');
+    return `<div class="krow ${x.tag}"><div class="kn">${g === 'e' ? `<span class="sw" style="background:${ELEM[k].color}"></span>` : ''}${n}${g === 'e' ? '魔法' : ''}<small>得意 ${x.good.length}人</small>${x.tag ? `<em class="tg">${TAG[x.tag]}</em>` : ''}</div><div class="kt">${top}</div></div>`;
+  });
+  const group = (t, a, b) => `<h4 class="kh">${t}</h4>${items.slice(a, b).join('')}`;
+  return group('武器', 0, 4) + group('魔法', 4, 10) + group('そのほか', 10, 14) + `<p class="note">それぞれの上位3人（休みの子を除く）。<span class="main-t">主力</span>は効かなくすると困る攻撃、<span class="thin-t">手薄</span>は弱点にしても突かれにくい攻撃です。</p>`;
+}
+function renderParty() { partyView($('tab-party'), false); }
+// 下から出す一覧（モンスター作りの画面からも開ける）
+function openParty() {
+  openSheet('<h3 style="margin:0 0 8px">パーティーの得意</h3><div id="party-sheet"></div>');
+  partyView($('party-sheet'), true);
+}
+function charSheet(id, back) {
   const C = CHARS[id], P = G.party[id], st = E.charStats(G, id);
   const bar = (label, k) => { const base = WEAPON[k] ? C.w[k] : ELEM[k] ? C.e[k] : C.s[k]; const a = E.apt(G, id, k); return `<div>${label}</div><div class="b"><i style="width:${base * 10}%"></i></div><div>${a}${a > base ? `<small style="color:var(--gold)">↑</small>` : ''}</div>`; };
   const PN = { careful: '慎重', rash: '無鉄砲', curious: '試したがり', pride: '得意技へのこだわり', logic: '理屈で考える', bold: '出たがり', kind: '仲間思い' };
@@ -134,7 +194,8 @@ function charSheet(id) {
     <h4>武器の得意度（0〜10、↑は使いこんで上達）</h4><div class="bars">${WEAPONS.map(k => bar(WEAPON[k].name, k)).join('')}</div>
     <h4>属性の得意度</h4><div class="bars">${ELEMS.map(k => bar(ELEM[k].name, k)).join('')}</div>
     <h4>そのほか</h4><div class="bars">${[['回復', 'heal'], ['歌', 'song'], ['かばう', 'guard'], ['分析', 'scan']].map(([l, k]) => bar(l, k)).join('')}</div>
-    <h4>性格</h4><div class="bars">${Object.entries(C.p).map(([k, v]) => `<div>${PN[k]}</div><div class="b"><i class="m" style="width:${v * 10}%"></i></div><div>${v}</div>`).join('')}</div>`);
+    <h4>性格</h4><div class="bars">${Object.entries(C.p).map(([k, v]) => `<div>${PN[k]}</div><div class="b"><i class="m" style="width:${v * 10}%"></i></div><div>${v}</div>`).join('')}</div>${back ? '<button class="btn small ghost" id="sheet-back">‹ 一覧にもどる</button>' : ''}`);
+  if (back) $('sheet-back').onclick = back;
 }
 function renderBook() {
   const el = $('tab-book');
@@ -178,6 +239,7 @@ function editor() {
   } else sv.innerHTML = '';
   edRender(true);
   $('ed-back').onclick = () => hub();
+  $('ed-party').onclick = $('ed-party2').onclick = () => openParty();
   $('ed-random').onclick = () => { D = randomDesign(f.budget, ''); nameAuto = true; edRender(true); };
   $('ed-ok').onclick = () => {
     if (E.costOf(D) > f.budget) return toast('魔力が足りません');
@@ -199,7 +261,7 @@ function edRender(full) {
     for (const b of $('ed-elem').children) b.onclick = () => { D.elem = b.dataset.k; edRender(true); };
     $('ed-stats').innerHTML = STATS.map(s => sliderRow(STAT[s].name, 0, 15, D.stats[s], `sv-${s}`)).join('');
     $('ed-stats').querySelectorAll('.sl').forEach((row, i) => wireSlider(row, v => { D.stats[STATS[i]] = v; edRender(false); }));
-    $('ed-res').innerHTML = KEYS.map(k => sliderRow(keyName(k), -3, 3, D.res[k] || 0, `rv-${k}`)).join('');
+    $('ed-res').innerHTML = KEYS.map(k => { const x = keyInfo(k); return sliderRow(`${keyName(k)}<small class="kc ${x.tag}">得意${x.good.length}人${x.tag ? '・' + TAG[x.tag] : ''}</small>`, -3, 3, D.res[k] || 0, `rv-${k}`); }).join('');
     $('ed-res').querySelectorAll('.sl').forEach((row, i) => wireSlider(row, v => { if (v) D.res[KEYS[i]] = v; else delete D.res[KEYS[i]]; edRender(false); }));
     $('ed-traits').innerHTML = Object.entries(TRAITS).map(([k, t]) => `<label class="trait"><input type="checkbox" data-k="${k}" ${D.traits.includes(k) ? 'checked' : ''}><span><b>${t.name}</b>（魔力${t.cost}）<small>${t.desc}</small></span></label>`).join('');
     for (const c of $('ed-traits').querySelectorAll('input')) c.onchange = () => { D.traits = D.traits.filter(x => x !== c.dataset.k); if (c.checked) D.traits.push(c.dataset.k); edRender(false); };
