@@ -1,9 +1,9 @@
 // 画面と操作：タイトル・魔王の玉座・モンスター作り・作戦会議と戦闘の再生
-import { IDS, CHARS, ELEMS, ELEM, WEAPONS, WEAPON, KEYS, keyName, STATS, STAT, SHAPES, TRAITS, STAGES, RES_MULT } from './data.js?v=2026.11.03-2';
-import * as E from './engine.js?v=2026.11.03-2';
-import { monsterSVG } from './monster.js?v=2026.11.03-2';
-import { AI, OLLAMA_MODEL } from './llm.js?v=2026.11.03-2';
-import { VERSION } from './version.js?v=2026.11.03-2';
+import { IDS, CHARS, ELEMS, ELEM, WEAPONS, WEAPON, KEYS, keyName, STATS, STAT, SHAPES, TRAITS, STAGES, RES_MULT } from './data.js?v=2026.11.03-3';
+import * as E from './engine.js?v=2026.11.03-3';
+import { monsterSVG } from './monster.js?v=2026.11.03-3';
+import { AI, OLLAMA_MODEL } from './llm.js?v=2026.11.03-3';
+import { VERSION } from './version.js?v=2026.11.03-3';
 
 const $ = id => document.getElementById(id);
 const h = (tag, attrs = {}, html = '') => { const e = document.createElement(tag); for (const [k, v] of Object.entries(attrs)) { if (k === 'on') for (const [ev, fn] of Object.entries(v)) e.addEventListener(ev, fn); else if (k === 'style') e.style.cssText = v; else e.setAttribute(k, v); } if (html) e.innerHTML = html; return e; };
