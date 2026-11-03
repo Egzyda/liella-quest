@@ -251,3 +251,6 @@ button { touch-action: manipulation; }
 .result .btn-row { display: flex; gap: 8px; margin-top: 14px; }
 .result .btn-row .btn { margin: 0; }
 .result .btn-row .ghost { flex: 0 0 38%; }
+/* 入力欄のある窓は上に出す（iPhoneのキーボードで隠れないように） */
+.sheet.top { align-items: flex-start; padding: calc(16px + var(--safe-t)) 12px 0; }
+.sheet.top .sheet-body { border-radius: 18px; border: 1px solid var(--line); padding-bottom: 18px; }

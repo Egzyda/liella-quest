@@ -1,10 +1,10 @@
 // 画面と操作：タイトル・魔王の玉座・モンスター作り・作戦会議と戦闘の再生
-import { IDS, CHARS, charGear, ELEMS, ELEM, WEAPONS, WEAPON, KEYS, keyName, STATS, STAT, SHAPES, TRAITS, STAGES, RES_MULT } from './data.js?v=2026.11.03-17';
-import * as E from './engine.js?v=2026.11.03-17';
-import { monsterSVG } from './monster.js?v=2026.11.03-17';
-import { AI, OLLAMA_MODEL } from './llm.js?v=2026.11.03-17';
-import { say } from './talk.js?v=2026.11.03-17';
-import { VERSION } from './version.js?v=2026.11.03-17';
+import { IDS, CHARS, charGear, ELEMS, ELEM, WEAPONS, WEAPON, KEYS, keyName, STATS, STAT, SHAPES, TRAITS, STAGES, RES_MULT } from './data.js?v=2026.11.03-18';
+import * as E from './engine.js?v=2026.11.03-18';
+import { monsterSVG } from './monster.js?v=2026.11.03-18';
+import { AI, OLLAMA_MODEL } from './llm.js?v=2026.11.03-18';
+import { say } from './talk.js?v=2026.11.03-18';
+import { VERSION } from './version.js?v=2026.11.03-18';
 
 const $ = id => document.getElementById(id);
 const h = (tag, attrs = {}, html = '') => { const e = document.createElement(tag); for (const [k, v] of Object.entries(attrs)) { if (k === 'on') for (const [ev, fn] of Object.entries(v)) e.addEventListener(ev, fn); else if (k === 'style') e.style.cssText = v; else e.setAttribute(k, v); } if (html) e.innerHTML = html; return e; };
@@ -23,7 +23,8 @@ function save() { try { localStorage.setItem(KEY, JSON.stringify({ G, set })); }
 
 function show(id) { for (const s of document.querySelectorAll('.screen')) s.hidden = s.id !== id; }
 function toast(t) { const el = $('toast'); el.textContent = t; el.classList.add('on'); clearTimeout(toast.t); toast.t = setTimeout(() => el.classList.remove('on'), 2600); }
-function openSheet(html) { $('sheet-content').innerHTML = html; $('sheet').hidden = false; }
+// top：上に出す（キーボードで隠れないように。入力欄があるとき）
+function openSheet(html, top = false) { $('sheet-content').innerHTML = html; $('sheet').classList.toggle('top', top); $('sheet').hidden = false; }
 $('sheet-close').onclick = () => { $('sheet').hidden = true; };
 $('sheet').onclick = e => { if (e.target.id === 'sheet') $('sheet').hidden = true; };
 
@@ -61,10 +62,10 @@ async function prepareAI() {
 $('btn-continue').onclick = async () => { if (!(await prepareAI())) return; if (!G.pname) askName(n => { G.pname = n; save(); hub(); }); else hub(); };
 // プレイヤーの名前（Liella!のみんなが呼ぶ名前。6文字まで）
 function askName(done) {
-  openSheet(`<div class="help"><h3>あなたの名前</h3><p class="note">Liella!のみんなが呼ぶ名前です（6文字まで）。魔王軍の名前にもなります。</p>
-    <div class="ed-row"><input id="pn" maxlength="6" value="${esc(set.pname || '')}" placeholder="なまえ" autocomplete="off"></div>
-    <button class="btn primary" id="pn-ok">これで始める</button></div>`);
-  const ok = () => { const n = $('pn').value.trim().slice(0, 6); if (!n) return toast('名前を入れてください'); set.pname = n; save(); $('pn').blur(); $('sheet').hidden = true; resetScroll(); done(n); };
+  openSheet(`<div class="help"><h3>あなたの名前</h3><p class="note">Liella!のみんなが呼ぶ名前です（6文字まで）。魔王軍の名前にもなります。何も入れなければ「麗」になります。</p>
+    <div class="ed-row"><input id="pn" maxlength="6" value="${esc(set.pname || '')}" placeholder="麗" autocomplete="off"></div>
+    <button class="btn primary" id="pn-ok">これで始める</button></div>`, true);
+  const ok = () => { const n = $('pn').value.trim().slice(0, 6) || '麗'; set.pname = n; save(); $('pn').blur(); $('sheet').hidden = true; resetScroll(); done(n); };
   $('pn-ok').onclick = ok;
   $('pn').onkeydown = e => { if (e.key === 'Enter') ok(); };
 }
