@@ -3,8 +3,8 @@
 // ・戦いはターン制。誰が何をするかは、性格と「図鑑」（これまでに見たこと）から決める
 // ・図鑑には見たことだけが書かれる（会心の一撃を「弱点」と勘ちがいすることもある）
 // ・負けたら町に戻って反省し、もう一度挑む
-import { ELEMS, ELEM, FOLK_WEAK, WEAPONS, WEAPON, KEYS, keyName, STATS, STAT, RES_MULT, SHAPES, TRAITS, STAGES, MAOU_GROW, IDS, CHARS, GROW_KEYS, baseApt, growWeight, growCap, CMDS, CMD_START, TRUMP } from './data.js?v=2026.11.03-23';
-import { say, nameOf } from './talk.js?v=2026.11.03-23';
+import { ELEMS, ELEM, FOLK_WEAK, WEAPONS, WEAPON, KEYS, keyName, STATS, STAT, RES_MULT, SHAPES, TRAITS, STAGES, MAOU_GROW, IDS, CHARS, GROW_KEYS, baseApt, growWeight, growCap, CMDS, CMD_START, TRUMP, GOLD, ITEMS, HABIT_TEXT } from './data.js?v=2026.11.03-25';
+import { say, nameOf } from './talk.js?v=2026.11.03-25';
 
 export const rnd = { f: Math.random };
 const R = () => rnd.f();
@@ -15,9 +15,9 @@ const gauss = () => (R() + R() + R() - 1.5) / 1.5;
 // ---------------- 新しい旅 ----------------
 export function newGame() {
   const party = {};
-  for (const id of IDS) party[id] = { lv: 1, exp: 0, mast: {}, tired: 0, hurt: 0, hpR: 1, bonus: {}, pts: 0, picks: [] };
+  for (const id of IDS) party[id] = { lv: 1, exp: 0, mast: {}, tired: 0, hurt: 0, hpR: 1, bonus: {}, pts: 0, picks: [], gear: { wpn: 0, wpnK: null, armor: 0, charm: [] } };
   const G = { v: 2, stage: 0, fight: 0, party, book: {}, designs: [], next: null, tries: {}, history: [], cleared: false, pname: '', day: 1, limit: STAGES[0].fights[0].days, power: 0, maouWin: false,
-    maou: { cmds: CMD_START.slice() }, seen: {}, scout: {}, phase: null, policy: [], free: [] };
+    maou: { cmds: CMD_START.slice() }, seen: {}, scout: {}, phase: null, policy: [], free: [], gold: GOLD.start, habit: {}, rumor: null };
   customize(G);
   return G;
 }
@@ -121,7 +121,9 @@ export function migrate(G) {
   if (!G.policy) G.policy = [];
   if (!G.free) G.free = [];
   if (G.phase === undefined) G.phase = null;
-  for (const id of IDS) { const P = G.party[id]; if (P.hpR == null) P.hpR = 1; if (!P.bonus) P.bonus = {}; if (P.pts == null) P.pts = 0; if (!P.picks) P.picks = []; }
+  if (G.gold == null) G.gold = GOLD.start;
+  if (!G.habit) G.habit = {};
+  for (const id of IDS) { const P = G.party[id]; if (P.hpR == null) P.hpR = 1; if (!P.bonus) P.bonus = {}; if (P.pts == null) P.pts = 0; if (!P.picks) P.picks = []; if (!P.gear) P.gear = { wpn: 0, wpnK: null, armor: 0, charm: [] }; }
   return G;
 }
 
@@ -132,13 +134,14 @@ export function charStats(G, id) {
   return {
     maxHp: Math.round(C.base.hp * (1 + 0.12 * (P.lv - 1))),
     atk: C.base.atk * g * tiredF, mag: C.base.mag * g * tiredF,
-    def: C.base.def * g, mdef: C.base.mdef * g, spd: C.base.spd * (1 + 0.04 * (P.lv - 1)),
+    def: C.base.def * g * (1 + 0.12 * (P.gear?.armor || 0)), mdef: C.base.mdef * g * (1 + 0.12 * (P.gear?.armor || 0)), spd: C.base.spd * (1 + 0.04 * (P.lv - 1)),
   };
 }
 // 得意度＋育ちぶん（初期カスタム・鍛える）＋使いこんだぶん（熟練度20ごとに+1、最大+5）
 export function apt(G, id, k) {
   const P = G.party[id];
-  return Math.min(14, baseApt(id, k) + (P.bonus?.[k] || 0) + Math.floor((P.mast[k] || 0) / 20));
+  const gw = P.gear && P.gear.wpnK === k ? P.gear.wpn : 0;
+  return Math.min(15, baseApt(id, k) + (P.bonus?.[k] || 0) + gw + Math.floor((P.mast[k] || 0) / 20));
 }
 function power(G, id, k, st) {
   const a = apt(G, id, k);
@@ -172,7 +175,8 @@ const FOLK_SHAPE = {
 };
 // 思いこみの理由（形からか、色＝属性からか）
 const FOLK_SHAPE_TEXT = { slime: 'ぷよぷよしたスライム', beast: '獣', bird: '空を飛ぶ鳥', golem: '岩のゴーレム', ghost: '体のない亡霊', dragon: '大きなドラゴン', knight: 'よろいの騎士' };
-export function folkText(d, k) {
+export function folkText(d, k, G) {
+  if (G?.rumor && G.rumor.k === k && !G.rumor.seen) return `町の噂では、${keyName(k)}が効くらしい……！`;
   if (ELEM[k] && FOLK_WEAK[d.elem] === k) return `${ELEM[d.elem].name}の魔物なら、${keyName(k)}が効くはず……！`;
   return `${FOLK_SHAPE_TEXT[d.shape] || SHAPES[d.shape].name}なら、${keyName(k)}が効きそう……！`;
 }
@@ -190,6 +194,8 @@ export function belief(G, d, k) {
   if (b?.res[k] != null) return { m: b.res[k], src: 'fact' };
   const o = b?.obs[k];
   if (o && o.n > 0) return { m: o.v, src: 'known', n: o.n };
+  // 魔王が流した噂（次の戦いだけ。見抜かれたら効かない）
+  if (G.rumor && G.rumor.k === k && !G.rumor.seen) return { m: 1.45, src: 'folk', rumor: true };
   const f = folkMult(d, k);
   return { m: f, src: f !== 1 ? 'folk' : 'none' };
 }
@@ -214,11 +220,21 @@ export function analyzeLook(G, d) {
   const folk = all.filter(x => x.src === 'folk' && x.m > 1).sort((a, b) => b.m - a.m);
   return { b, good, bad, folk, met: b?.met || 0, losses: b?.losses || 0 };
 }
+// 魔王のくせ：何度も使われた号令（重みが1.3以上でいちばん多いもの）
+export function topHabit(G) {
+  const h = Object.entries(G.habit || {}).filter(([k, v]) => v >= 1.3 && HABIT_TEXT[k]).sort((a, b) => b[1] - a[1])[0];
+  return h ? h[0] : null;
+}
 // ルールで決める会議。AIを使うときは ai に { team, focus, plan } が入る
 export function meeting(G, d, ai = null) {
   const ev = [];
   const av = available(G);
   const strat = [...av].sort((a, b) => apt(G, b, 'scan') + CHARS[b].p.logic * 0.3 - (apt(G, a, 'scan') + CHARS[a].p.logic * 0.3))[0];
+  // 噂：分析が得意な参謀は見抜くことがある
+  if (G.rumor && !G.rumor.checked) {
+    G.rumor.checked = true;
+    if (R() < Math.max(0, apt(G, strat, 'scan') - 5) * 0.09) { G.rumor.seen = true; ev.push({ t: 'think', sp: strat, text: `「${keyName(G.rumor.k)}に弱い」という町の噂……出どころが怪しい。信じないでおこう。` }); }
+  }
   const A = analyzeLook(G, d);
   const look = lookName(d);
   ev.push({ t: 'narr', text: A.met ? `また${look}が現れた。（これで${A.met + 1}回目）` : `見たことのない魔物――${look}が道をふさいでいる。` });
@@ -236,7 +252,11 @@ export function meeting(G, d, ai = null) {
     if (ai.reason) ev.push({ t: 'think', sp: strat, text: ai.reason });
   } else if (A.good.length) { focus = A.good[0].k; plan = 'focus'; ev.push(say(strat, 'meet_known', { k: keyName(focus) })); }
   else if (A.met && A.bad.length) { plan = 'explore'; ev.push(say(strat, 'meet_bad', { k: keyName(A.bad[0].k) })); }
-  else if (A.folk.length) { focus = A.folk[0].k; plan = 'folk'; ev.push(say(strat, 'meet_folk', { e: folkWhy(d, focus), k: keyName(focus) })); }
+  else if (A.folk.length) {
+    focus = A.folk[0].k; plan = 'folk';
+    if (belief(G, d, focus).rumor) ev.push({ t: 'think', sp: strat, text: `町の噂では、この魔物は${keyName(focus)}に弱いらしい。試してみよう。` });
+    else ev.push(say(strat, 'meet_folk', { e: folkWhy(d, focus), k: keyName(focus) }));
+  }
   else { plan = 'explore'; ev.push(say(strat, 'meet_unknown', {})); }
   if (A.losses > 0 && !useAI) ev.push({ t: 'think', sp: strat, text: `前は負けた。${A.bad.length ? keyName(A.bad[0].k) + 'は効かなかったから、使わない。' : '同じやり方では勝てない。'}` });
   // 出撃の4人
@@ -287,10 +307,19 @@ export function meeting(G, d, ai = null) {
       ev.push(say(eager, 'bench', {}));
     }
   }
+  // 魔王のくせ：よく使われた号令に対策する（盾役を入れる・身構える…）
+  const habit = topHabit(G);
+  if (habit) {
+    ev.push(say(strat, 'habit_note', { k: HABIT_TEXT[habit] }));
+    if (['aim_healer', 'aim_pick', 'aim_weak', 'roar'].includes(habit) && !team.some(id => apt(G, id, 'guard') >= 6)) {
+      const tank = av.filter(id => !team.includes(id) && apt(G, id, 'guard') >= 6 && (G.party[id].hpR ?? 1) > 0.4).sort((a, b) => apt(G, b, 'guard') - apt(G, a, 'guard'))[0];
+      if (tank) team[team.length - 1] = tank;
+    }
+  }
   ev.push({ t: 'team', team: team.slice(), text: `出撃：${team.map(nameOf).join('・')}` });
   for (const id of team) if (G.party[id].tired >= 2) ev.push(say(id, 'tired', {}));
   ev.push(say(team[0], 'go', {}));
-  return { team, focus, plan, strat, ev, why };
+  return { team, focus, plan, strat, ev, why, habit };
 }
 
 // ---------------- 戦闘 ----------------
@@ -319,7 +348,11 @@ export async function battle(G, d, M, hooks = {}) {
   const gmax = 5 + (MC.has('g_max') ? 1 : 0);
   let aim = 'free', aimId = null, mst = 'normal', charge = 0, braced = false;
   let reflectN = 0, flyN = 0, pierceNext = false, keenN = 0, aimHits = 0, aimSaid = false;
-  const scared = {};
+  let roarN = 0, mimicN = 0, fearN = 0;
+  const scared = {}, onceUsed = new Set(), cmdUsed = new Set();
+  // Liella!が覚えた魔王のくせへの対策
+  const habit = M.habit;
+  const braceBonus = habit === 'charge' ? 0.35 : 0, scareResist = habit === 'scare' ? 0.35 : 0;
   const join = id => { st[id] = charStats(G, id); hp[id] = Math.max(1, Math.round(st[id].maxHp * (G.party[id].hpR ?? 1))); used[id] = used[id] || {}; hate[id] = 8 + R() * 4; };
   // 外野の分析役：控えの中でいちばん分析が得意な子（6以上）
   const analystOf = () => bench.filter(id => apt(G, id, 'scan') >= 6).sort((a, b) => apt(G, b, 'scan') - apt(G, a, 'scan'))[0] || null;
@@ -327,12 +360,16 @@ export async function battle(G, d, M, hooks = {}) {
   // 画面に出す状態（体力・号令ゲージ・バフや挑発などのアイコン）
   const snap = () => ({ mon: mon.hp, max: mon.max, team: team.slice(), hp: { ...hp }, max2: Object.fromEntries(team.map(id => [id, st[id].maxHp])),
     g: gauge, gmax, aim, aimId, mst, charge, raged: mon.raged, taunt: taunt.left > 0 ? taunt.id : null, guardBy, buff, poison: { ...poison }, shield: { ...shield }, scared: { ...scared },
-    reflectN, flyN, keenN, pierceNext });
+    reflectN, flyN, keenN, pierceNext, roarN, mimicN, fearN, once: [...onceUsed] });
   const push = e => { const x = { ...e, s: snap() }; ev.push(x); hooks.onEvent?.(x); };
   let stance = 'normal', pinchDone = false, surpriseFlag = false, lastTactic = 0, aiUsed = 0, tactics = 0;
   const recent = [];
   const alive = () => team.filter(id => hp[id] > 0);
   push({ t: 'start', text: `${d.name}（${lookName(d)}）との戦いが始まった！` });
+  if (['aim_healer', 'aim_pick', 'aim_weak', 'roar'].includes(habit)) {
+    const tk = team.filter(id => apt(G, id, 'guard') >= 5).sort((a, b) => apt(G, b, 'guard') - apt(G, a, 'guard'))[0];
+    if (tk) { guardBy = tk; push({ t: 'buff', sp: tk, text: `${nameOf(tk)}は最初から仲間の前に立ち、狙われそうな子をかばう構えをとった。` }); }
+  } else if (habit === 'stance_atk' || habit === 'combo') stance = 'defend';
 
   const think = (id, reason, text) => { if (thinkLast[id] === reason + text) return; thinkLast[id] = reason + text; push({ t: 'think', sp: id, text }); };
 
@@ -400,7 +437,7 @@ export async function battle(G, d, M, hooks = {}) {
       if (B.res[k] != null) think(id, 'known', `分析では、${keyName(k)}がよく効くはず。`);
       else if (inBook.has(k)) think(id, 'known', `図鑑によると、${keyName(k)}がよく効くはず。`);
       else think(id, 'known', `さっきの${keyName(k)}がよく効いていた。続けて狙おう。`);
-    } else if (o.reason === 'folk') think(id, 'folk', folkText(d, k));
+    } else if (o.reason === 'folk') think(id, 'folk', folkText(d, k, G));
     else if (o.reason === 'folkbad') think(id, 'folkbad', `${keyName(k)}は効きにくそうだけど……試してみる。`);
     else if (o.reason === 'explore') { think(id, 'explore', `まだ試していない${keyName(k)}を試してみよう。`); if (R() < 0.4) push(say(id, 'try', { k: keyName(k) })); }
     else if (o.reason === 'plan') think(id, 'plan', `作戦どおり、${keyName(k)}で攻める。`);
@@ -434,7 +471,7 @@ export async function battle(G, d, M, hooks = {}) {
     const rm = RES_MULT[d.res[k] || 0];
     const df = WEAPON[k] ? ms.defF : ms.mdefF;
     const ran = 0.85 + R() * 0.3, crit = R() < 0.08;
-    const base = power(G, id, k, s) * (buff ? 1.15 : 1);
+    const base = power(G, id, k, s) * (buff ? 1.15 : 1) * (fearN > 0 ? 0.7 : 1);
     // 魔王の構え：攻めると受けるダメージも増え、守ると減る。ためている間も受けやすい
     const cf = (mst === 'atk' ? 1.2 : mst === 'def' ? 0.75 : 1) * (charge >= 1 ? 1.25 : 1);
     const dmg = Math.max(rm === 0 ? 0 : 1, Math.round(base * rm * df * ran * (crit ? 1.5 : 1) * cf));
@@ -442,6 +479,7 @@ export async function battle(G, d, M, hooks = {}) {
     hate[id] += dmg * 0.5;
     // 見えた効き目を図鑑に書く（理屈派は会心の一撃を割り引いて考える）
     let seen = (dmg / base) / (crit && CHARS[id].p.logic >= 7 ? 1.5 : 1);
+    if (mimicN > 0) seen = Math.max(0.15, Math.min(2.2, 2.1 - seen)); // 擬態：効いて見えたり、効いていないように見えたり
     const o2 = B.obs[k];
     let surprise = false;
     if (o2 && o2.n >= 2 && Math.abs(o2.v - seen) >= 0.55) { surprise = true; B.obs[k] = { v: seen, n: 1 }; }
@@ -546,6 +584,7 @@ export async function battle(G, d, M, hooks = {}) {
     const hitOne = (id, mult) => {
       // 貫通：守りを6割無視し、盾の構え・かばうの軽減もなし（切り札の貫通は守りを全部無視）
       const defv = (useMag ? st[id].mdef : st[id].def) * (pierceNext ? 0 : pierce ? 0.4 : 1);
+      if (useMag && G.party[id].gear?.charm?.includes(d.elem)) mult *= 0.7; // お守り
       let dm = Math.max(1, Math.round(pw * 1.7 * (30 / (30 + defv * 1.5)) * mult * (0.85 + R() * 0.3)));
       hp[id] = Math.max(0, hp[id] - dm);
       return dm;
@@ -581,8 +620,9 @@ export async function battle(G, d, M, hooks = {}) {
       else if (aim === 'healer') aimT = al.filter(id => apt(G, id, 'heal') >= 5).sort((a, b) => apt(G, b, 'heal') - apt(G, a, 'heal'))[0] || al.slice().sort((a, b) => hp[a] / st[a].maxHp - hp[b] / st[b].maxHp)[0];
       else if (aim === 'pick' && al.includes(aimId)) aimT = aimId;
       let focused = false;
-      if (aimT && R() < (tauntOn && keenN <= 0 ? 0.35 : 0.75)) { target = aimT; focused = true; }
-      if (guardBy && hp[guardBy] > 0 && guardBy !== target && guardBy !== taunt.id) { txt = `${nameOf(guardBy)}がかばった！ `; target = guardBy; }
+      if (roarN > 0 && !aimT) aimT = al.slice().sort((a, b) => hate[b] - hate[a])[0];
+      if (aimT && (roarN > 0 || R() < (tauntOn && keenN <= 0 ? 0.35 : 0.75))) { target = aimT; focused = true; }
+      if (roarN <= 0 && guardBy && hp[guardBy] > 0 && guardBy !== target && guardBy !== taunt.id) { txt = `${nameOf(guardBy)}がかばった！ `; target = guardBy; }
       let mult = 1;
       if (big) { txt = 'ためた一撃！ ' + txt; if (braced) { mult *= 0.7; txt += '（身構えていた！）'; } charge = 0; braced = false; }
       if (!pierce) {
@@ -633,7 +673,13 @@ export async function battle(G, d, M, hooks = {}) {
     else if (cid === 'charge') { if (charge) return false; charge = 1; txt = '力をためろ'; }
     else if (cid === 'scare') { if (!al.includes(c.target) || scared[c.target]) return false; txt = `${nameOf(c.target)}を威嚇しろ`; }
     else if (cid === 'trump') { if (!d.traits.includes(sub)) return false; txt = `切り札だ！（${TRAITS[sub].name}）`; }
+    else if (cid === 'roar') { if (onceUsed.has('roar')) return false; txt = '吠えろ！'; }
+    else if (cid === 'combo') { txt = 'たたみかけろ'; }
+    else if (cid === 'mimic') { if (mimicN > 0) return false; txt = '姿を偽れ'; }
+    else if (cid === 'fear') { if (onceUsed.has('fear')) return false; txt = '恐怖を植えつけろ'; }
     else return false;
+    if (D.once) onceUsed.add(cid);
+    cmdUsed.add(cid);
     aimHits = 0; aimSaid = false;
     gauge -= D.cost;
     push({ t: 'cmd', text: `魔王の号令：「${txt}」` });
@@ -641,11 +687,24 @@ export async function battle(G, d, M, hooks = {}) {
     if (cid === 'charge') {
       const obs = [...al].sort((a, b) => CHARS[b].p.careful + CHARS[b].p.logic - CHARS[a].p.careful - CHARS[a].p.logic)[0];
       const cv = CHARS[obs].p.careful + CHARS[obs].p.logic;
-      if (R() < 0.25 + cv * 0.035) { braced = true; push(say(obs, 'react_charge', {})); }
+      if (R() < 0.25 + cv * 0.035 + braceBonus) { braced = true; push(say(obs, 'react_charge', {})); }
     } else if (cid === 'scare') {
       const t = c.target;
-      if (apt(G, t, 'guard') >= 6 && R() < 0.5) push({ t: 'mon', sp: t, text: `${nameOf(t)}は盾を構えて、ひるまなかった！` });
+      if ((apt(G, t, 'guard') >= 6 && R() < 0.5) || R() < scareResist) push({ t: 'mon', sp: t, text: `${nameOf(t)}は身構えていて、ひるまなかった！` });
       else { scared[t] = 1; push({ t: 'mon', sp: t, text: `${d.name}がにらみつけた！ ${nameOf(t)}はすくみ上がった！` }); push(say(t, 'react_scare', {})); }
+    } else if (cid === 'roar') {
+      roarN = 1; taunt.left = 0; guardBy = null; for (const k of Object.keys(shield)) shield[k] = 0;
+      push({ t: 'mon', text: `${d.name}が大地をゆるがす咆哮をあげた！ 挑発も盾の構えも吹き飛んだ！` });
+    } else if (cid === 'combo') {
+      monAcc += 1;
+      push({ t: 'mon', text: `${d.name}の動きが速くなった……！ このターン、もう一度動く！` });
+    } else if (cid === 'mimic') {
+      mimicN = 2;
+      push({ t: 'mon', text: `${d.name}の体の色がゆらいで、見えにくくなった……。` });
+    } else if (cid === 'fear') {
+      fearN = 2;
+      push({ t: 'mon', text: `${d.name}の目が赤く光った！ Liella!の体がこわばる……（2ターン攻撃が下がる）` });
+      const v = al[Math.floor(R() * al.length)]; if (v) push(say(v, 'react_scare', {}));
     } else if (cid === 'trump') {
       B.traits[sub] = true;
       if (sub === 'sweep') {
@@ -674,6 +733,10 @@ export async function battle(G, d, M, hooks = {}) {
       else if (d.traits.includes('regen') && mon.hp / mon.max < 0.5) add({ id: 'trump:regen' }, 2);
       else if (d.traits.includes('rage') && !mon.raged && mon.hp / mon.max < 0.75) add({ id: 'trump:rage' }, 2);
     }
+    if (!out.length && MC.has('fear') && !onceUsed.has('fear') && al.length >= 3 && g >= 4 && R() < 0.5) add({ id: 'fear' }, 4);
+    if (!out.length && MC.has('roar') && !onceUsed.has('roar') && (taunt.left > 0 || guardBy) && aim !== 'free' && g >= 4) add({ id: 'roar' }, 4);
+    if (!out.length && MC.has('combo') && g >= 3 && R() < 0.35) add({ id: 'combo' }, 3);
+    if (!out.length && MC.has('mimic') && mimicN <= 0 && g >= 3 && round <= 3 && R() < 0.4) add({ id: 'mimic' }, 3);
     if (!out.length && MC.has('charge') && !charge && R() < 0.35) add({ id: 'charge' }, 2);
     if (!out.length && MC.has('scare') && g >= 3) { const t = al.slice().sort((a, b) => hate[b] - hate[a])[0]; if (apt(G, t, 'guard') < 6 && !scared[t]) add({ id: 'scare', target: t }, 2); }
     if (al.some(id => HURT(id) < 0.45) && aim !== 'weak' && MC.has('aim_weak')) add({ id: 'aim_weak' }, 1);
@@ -778,7 +841,10 @@ export async function battle(G, d, M, hooks = {}) {
     }
     if (buff) buff--;
     // 号令ゲージがたまる（大きく削られたぶんも）
-    gaugeAcc += 1 + (MC.has('g_max') ? 0.3 : 0) + (monStart - mon.hp >= mon.max * 0.15 ? 1 : 0);
+    gaugeAcc += 1 + (MC.has('g_rate') ? 0.5 : 0) + (monStart - mon.hp >= mon.max * 0.15 ? 1 : 0);
+    if (roarN > 0) roarN--;
+    if (mimicN > 0) mimicN--;
+    if (fearN > 0) fearN--;
     while (gaugeAcc >= 1) { gaugeAcc--; gauge = Math.min(gmax, gauge + 1); }
     if (flyN > 0) flyN--;
     if (keenN > 0) keenN--;
@@ -830,6 +896,9 @@ export async function battle(G, d, M, hooks = {}) {
 
   // ---- 結果 ----
   const fightInfo = currentFight(G);
+  // 魔王のくせを覚える（使った号令は重みが増え、使わないと薄れる）
+  for (const k of new Set([...Object.keys(G.habit), ...cmdUsed])) { const kk = k.startsWith('stance_def') || k === 'aim_free' || k === 'stance_norm' ? null : k; if (!kk) continue; G.habit[kk] = (G.habit[kk] || 0) * 0.7 + (cmdUsed.has(kk) ? 1 : 0); }
+  G.rumor = null;
   const win = outcome === 'win';
   if (win) {
     const last = alive().sort(() => R() - 0.5)[0];
@@ -871,6 +940,8 @@ export async function battle(G, d, M, hooks = {}) {
   G.history.push({ day: G.day, name: d.name, look: lookName(d), team: M.team, win, outcome, rounds: round });
   G.lastD = JSON.parse(JSON.stringify(d)); G.lastOutcome = outcome;
   G.day++;
+  // お金：Liella!は戦うたびに手に入る（自由行動の買い物に使う）
+  G.gold = (G.gold || 0) + (win ? GOLD.win : GOLD.lose);
   // 魔王の成長：戦うたびに魔力が増える（撃退したら多め）
   const grow = win ? MAOU_GROW.lose : MAOU_GROW.win;
   G.power = (G.power || 0) + grow;

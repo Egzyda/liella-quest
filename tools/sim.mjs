@@ -10,6 +10,8 @@ function maouAct(G) {
   if (t === 'none') return null;
   if (t === 'learn') { const l = learnable(G); return l.length ? { type: 'learn', cmd: pick(l) } : { type: 'power' }; }
   if (t === 'scout') return { type: 'scout', ids: [pick(IDS), pick(IDS)] };
+  if (t === 'rumor') return { type: 'rumor', k: pick(KEYS) };
+  if (t === 'eavesdrop') return { type: 'eavesdrop' };
   if (t === 'assassin') { const av = IDS.filter(id => !G.party[id].hurt).sort((a, b) => G.party[b].lv - G.party[a].lv); return { type: 'assassin', id: av[0] || IDS[0] }; }
   return { type: t };
 }

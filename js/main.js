@@ -1,12 +1,12 @@
 // 画面と操作：タイトル・魔王の玉座・モンスター作り・作戦会議と戦闘の再生
-import { CMDS, CMD_LINE, MAOU_ACTS, TRUMP, GROW_KEYS, growText, baseApt as bApt, IDS, CHARS, charGear, ELEMS, ELEM, WEAPONS, WEAPON, KEYS, keyName, STATS, STAT, SHAPES, TRAITS, STAGES, RES_MULT } from './data.js?v=2026.11.03-23';
-import * as E from './engine.js?v=2026.11.03-23';
-import { monsterSVG } from './monster.js?v=2026.11.03-23';
-import { AI, OLLAMA_MODEL } from './llm.js?v=2026.11.03-23';
-import { icon } from './icons.js?v=2026.11.03-23';
-import { freePhase, learnable, rowText, decidePolicy } from './camp.js?v=2026.11.03-23';
-import { say } from './talk.js?v=2026.11.03-23';
-import { VERSION } from './version.js?v=2026.11.03-23';
+import { HABIT_TEXT, ITEMS, CMDS, CMD_LINE, MAOU_ACTS, TRUMP, GROW_KEYS, growText, baseApt as bApt, IDS, CHARS, charGear, ELEMS, ELEM, WEAPONS, WEAPON, KEYS, keyName, STATS, STAT, SHAPES, TRAITS, STAGES, RES_MULT } from './data.js?v=2026.11.03-25';
+import * as E from './engine.js?v=2026.11.03-25';
+import { monsterSVG } from './monster.js?v=2026.11.03-25';
+import { AI, OLLAMA_MODEL } from './llm.js?v=2026.11.03-25';
+import { icon } from './icons.js?v=2026.11.03-25';
+import { freePhase, learnable, rowText, decidePolicy } from './camp.js?v=2026.11.03-25';
+import { say } from './talk.js?v=2026.11.03-25';
+import { VERSION } from './version.js?v=2026.11.03-25';
 
 const $ = id => document.getElementById(id);
 const h = (tag, attrs = {}, html = '') => { const e = document.createElement(tag); for (const [k, v] of Object.entries(attrs)) { if (k === 'on') for (const [ev, fn] of Object.entries(v)) e.addEventListener(ev, fn); else if (k === 'style') e.style.cssText = v; else e.setAttribute(k, v); } if (html) e.innerHTML = html; return e; };
@@ -104,8 +104,9 @@ const HELP = `<div class="help"><h3>遊び方</h3>
 <p><b>モンスター作り</b>：能力（体力・攻撃・防御…）、効き目（弱点と耐性）、特性（再生・飛行…）を決める。能力は1ポイント＝魔力1で、どの能力も1ポイントでだいたい同じくらい強くなります（0〜15）。ただし防御は、片方だけ上げるとパーティーがもう片方（物理⇔魔法）で攻めてくるので、両方上げると効きます。弱点を作ると魔力が少し戻ります（最大9）。名前は「おまかせ」で形・属性・能力から自動で付きます。</p>
 <p><b>見た目と言い伝え</b>：パーティーは見た目（形と色）で判断します。火の色なら「水が効くはず」と思いこむので、そこを無効にしておくと引っかかります。同じ見た目で中身を変えると、前の記憶が通じず混乱します。</p>
 <p><b>パーティー</b>：11人それぞれ武器や属性の得意度（0〜10）、性格がちがいます。使った武器や魔法は少しずつ上達します。戦った人は疲れ、倒れた人は次の戦いを休みます。控えも経験値を半分もらえます。</p>
-<p><b>号令</b>：戦闘中、モンスターの下の「号令」から指示を出せます（押すと一時停止）。号令ゲージ（金のひし形）を使い、次のターンから効きます。最初は「狙い（自由・弱った子）」と「構え（攻め・守り）」だけ。ため・威嚇・切り札・回復役ねらいなどは、自由行動で覚えます。「最後まで」で飛ばすと、おまかせで号令します。</p>
-<p><b>自由行動</b>：戦いのあと、Liella!は町で休む・鍛える・情報を集める。魔王は1つだけ「号令を覚える」「力をためる」「偵察（2人を全部見る）」「刺客（1人を大きく削る）」から選べます。</p>
+<p><b>号令</b>：戦闘中、モンスターの下の「号令」から指示を出せます（押すと一時停止）。号令ゲージ（金のひし形）を使い、次のターンから効きます。最初は「狙い（自由・弱った子）」と「構え（攻め・守り）」だけ。ため・威嚇・切り札・回復役ねらい、さらに咆哮・連撃・擬態・恐怖などは、自由行動で覚えます。「最後まで」で飛ばすと、おまかせで号令します。</p>
+<p><b>自由行動</b>：戦いのあと、Liella!は町で休む・鍛える・買い物（武器・よろい・お守り）・情報集め。魔王は1つだけ「号令を覚える」「力をためる」「偵察（2人を全部見る）」「盗み聞き（今夜の過ごし方と次の方針を全部聞く）」「噂を流す（〇〇に弱いという嘘）」「刺客（1人を大きく削る）」から選べます。</p>
+<p><b>魔王のくせ</b>：同じ号令ばかり使うと、Liella!が覚えて対策してきます（回復役狙いなら盾役が最初からかばう、ためなら身構える…）。魔王タブで、いま覚えられているくせが見られます。</p>
 <p><b>体力は持ち越し</b>：Liella!は戦いで減った体力が休むまで戻りません（控えは少し回復）。削っておくと次の戦いで別の子が出てきます。</p>
 <p><b>見えるのは見たことだけ</b>：Liella!の得意は、戦いで使ったものと偵察した子だけわかります（「？」はまだ見ていない）。毎回、初期の育ち方が少しずつ違うので、最初の「育成会議」の話もヒントになります。</p>
 <p><b>盾とねらわれやすさ</b>：モンスターは、目立つこと（強い攻撃・回復・歌）をした子をねらいやすくなります。盾が得意な子（きな子・可可・恋・夏美）は「挑発」で自分にねらいを集め、盾を構えてダメージを減らします。対抗するには特性の「見破り」（挑発に乗らず回復役や弱った子をねらう）や「貫通」（守りと盾を無視）を。</p>
@@ -260,6 +261,7 @@ function openParty() {
   openSheet('<h3 style="margin:0 0 8px">パーティーの得意</h3><div id="party-sheet"></div>');
   partyView($('party-sheet'), true);
 }
+const gearText = P => { const g = P.gear || {}; const a = []; if (g.wpn) a.push(`業物の${WEAPON[g.wpnK]?.name || '武器'}+${g.wpn}`); if (g.armor) a.push(`よろい${g.armor}`); for (const e of g.charm || []) a.push(`${ELEM[e].name}のお守り`); return a.length ? '・' + a.join('・') : ''; };
 function charSheet(id, back) {
   const C = CHARS[id], P = G.party[id], st = E.charStats(G, id);
   const bar = (label, k) => { if (!knowK(id, k)) return `<div>${label}</div><div class="b"></div><div class="unk">？</div>`; const base = baseApt(id, k); const a = E.apt(G, id, k); return `<div>${label}</div><div class="b"><i style="width:${Math.min(100, a * 10)}%"></i></div><div>${a}${a > base ? `<small style="color:var(--gold)">↑</small>` : ''}</div>`; };
@@ -267,7 +269,7 @@ function charSheet(id, back) {
   const sc = G.scout?.[id];
   const picks = sc && P.picks?.length ? (() => { const c = {}; for (const k of P.picks) c[k] = (c[k] || 0) + 1; return Object.entries(c).map(([k, n]) => `${keyName(k)}+${n}${bApt(id, k) <= 3 ? '（意外）' : ''}`).join('・'); })() : '';
   openSheet(`<div class="det-head" style="--c:${C.color}"><img src="${face(id)}" alt=""><div><b style="font-size:18px">${C.name}</b><div class="note">${C.role}<br>Lv${P.lv}　疲れ ${tiredDots(P.tired)}${P.hurt ? '　<span class="lose">ケガで休み</span>' : ''}　体力${Math.round((P.hpR ?? 1) * 100)}%</div></div></div>
-    <div class="note">装備：${charGear(id).join('・')}（はじめから持っている）${sc ? '　<span class="win">偵察ずみ</span>' : ''}</div>
+    <div class="note">装備：${charGear(id).join('・')}（はじめから）${sc ? gearText(P) : '＋？'}${sc ? '　<span class="win">偵察ずみ</span>' : ''}</div>
     <div class="note">${knowSt(id) ? `体力${st.maxHp}・力${Math.round(st.atk)}・魔力${Math.round(st.mag)}・守り${Math.round(st.def)}・魔法の守り${Math.round(st.mdef)}・素早さ${Math.round(st.spd)}` : '能力：？（2回以上戦うか、偵察するとわかる）'}</div>
     ${picks ? `<div class="note">今回の育ち方：${picks}${P.pts ? `　鍛えるポイント残り${P.pts}` : ''}</div>` : ''}
     <h4>武器の得意度（↑は育ったぶん、？はまだ見ていない）</h4><div class="bars">${WEAPONS.map(k => bar(WEAPON[k].name, k)).join('')}</div>
@@ -615,8 +617,8 @@ function addEv(e) {
 function openFree() {
   if (G.phase !== 'free') return;
   const L = learnable(G);
-  const acts = [['learn', L.length > 0], ['power', true], ['scout', true], ['assassin', true]];
-  openSheet(`<h3 style="margin:0 0 4px">自由行動（${G.day - 1}日目の夜）</h3><p class="note">Liella!は町で過ごしている（休む・鍛える・情報集め）。魔王は1つだけ動ける。</p>
+  const acts = [['learn', L.length > 0], ['power', true], ['scout', true], ['eavesdrop', true], ['rumor', true], ['assassin', true]];
+  openSheet(`<h3 style="margin:0 0 4px">自由行動（${G.day - 1}日目の夜）</h3><p class="note">Liella!は町で過ごしている（休む・鍛える・買い物・情報集め）。魔王は1つだけ動ける。</p>
     <div class="act-list">${acts.map(([k, ok]) => `<button class="act-opt" data-k="${k}" ${ok ? '' : 'disabled'}><b>${MAOU_ACTS[k].name}</b><small>${ok ? MAOU_ACTS[k].desc : 'もう覚えられる号令がない'}</small></button>`).join('')}</div>
     <div id="act-sub"></div>`);
   for (const b of document.querySelectorAll('.act-opt')) b.onclick = () => {
@@ -626,8 +628,23 @@ function openFree() {
 }
 function freeSub(k, L) {
   const sub = $('act-sub');
-  const go = act => { const r = freePhase(G, act); save(); freeResult(r); };
-  if (k === 'power') { sub.innerHTML = `<button class="btn primary" id="act-ok">力をためる</button>`; $('act-ok').onclick = () => go({ type: 'power' }); return; }
+  // Liella!の過ごし方：AIなら司令塔が考える（見切り15秒、だめならルール）
+  const go = async act => {
+    let plan = null;
+    if (AI.usable()) {
+      const strat = [...IDS].sort((a, b) => E.apt(G, b, 'scan') + CHARS[b].p.logic * 0.3 - (E.apt(G, a, 'scan') + CHARS[a].p.logic * 0.3))[0];
+      openSheet(`<div class="aiwait-box"><img src="${face(strat)}" alt=""><span>${CHARS[strat].name}が、みんなの過ごし方を考えている……</span></div>`);
+      plan = await Promise.race([AI.freePlan(G), new Promise(r => setTimeout(() => r(null), 15000))]).catch(() => null);
+      if (plan) plan.strat = strat;
+    }
+    const r = freePhase(G, act, plan); r.plan = plan; save(); freeResult(r);
+  };
+  if (k === 'power' || k === 'eavesdrop') { sub.innerHTML = `<button class="btn primary" id="act-ok">${MAOU_ACTS[k].name}</button>`; $('act-ok').onclick = () => go({ type: k }); return; }
+  if (k === 'rumor') {
+    sub.innerHTML = `<div class="label" style="margin-top:10px">「次の魔物は〇〇に弱い」の〇〇を選ぶ（その攻撃を効かなくした魔物を出すと引っかかる）</div><div class="chips">${KEYS.map(x => `<button data-k="${x}">${keyName(x)}</button>`).join('')}</div>`;
+    for (const b of sub.querySelectorAll('.chips button')) b.onclick = () => go({ type: 'rumor', k: b.dataset.k });
+    return;
+  }
   if (k === 'learn') {
     const byLine = {};
     for (const c of L) (byLine[CMDS[c].line] ||= []).push(c);
@@ -651,19 +668,20 @@ function freeSub(k, L) {
 function freeGroups(rows) {
   const solo = [], grp = {};
   for (const o of rows) {
-    if (G.scout[o.id] || o.act === 'info') solo.push(o);
+    if (G.scout[o.id] || G.heard || o.act === 'info') solo.push(o);
     else (grp[o.act] ||= []).push(o.id);
   }
-  const GN = { rest: '休んだ（体力・ケガ・疲れが回復）', train: '鍛えた（中身は見えなかった）', drill: '自主練をした' };
+  const GN = { rest: '休んだ（体力・ケガ・疲れが回復）', train: '鍛えた（中身は見えなかった）', drill: '自主練をした', shop: '買い物をした（中身は見えなかった）' };
   return Object.entries(grp).map(([a, ids]) => `<div class="free-grp"><div class="fg-h">${GN[a]}</div><div class="fg-faces">${ids.map(id => `<span class="kp" style="--c:${CHARS[id].color}"><img src="${face(id)}" alt="">${CHARS[id].name}</span>`).join('')}</div></div>`).join('')
     + solo.map(o => `<div class="free-row" style="--c:${CHARS[o.id].color}"><img src="${face(o.id)}" alt=""><b>${CHARS[o.id].name}</b><span>${esc(rowText(G, o))}</span></div>`).join('');
 }
 function freeResult(r) {
   openSheet(`<h3 style="margin:0 0 8px">夜が明けた</h3>
     <div class="free-maou">${esc(r.maou)}</div>
+    ${r.plan?.reason && G.heard ? `<div class="ev think"><img src="${face(r.plan.strat)}" alt=""><span>（${esc(r.plan.reason)}）</span></div>` : ''}
     <div class="label" style="margin-top:12px">Liella!の過ごし方</div>
     <div class="free-rows">${freeGroups(r.rows)}</div>
-    <p class="note">鍛えた中身は、偵察した子だけ見えます。</p>
+    <p class="note">鍛えた中身や買ったものは、偵察した子だけ見えます（盗み聞きした夜は全部）。</p>
     <button class="btn primary" id="free-ok">玉座へ戻る</button>`);
   $('free-ok').onclick = () => { $('sheet').hidden = true; hub(); };
   hub();
@@ -675,6 +693,7 @@ function renderMaou() {
   const lines = {};
   for (const c of Object.keys(CMDS)) (lines[CMDS[c].line] ||= []).push(c);
   $('tab-maou').innerHTML = `<div class="card"><b>魔王${esc(G.pname || '')}軍</b><div class="note">力 +${G.power || 0}（戦うたび・「力をためる」で増える）／偵察ずみ：${IDS.filter(id => G.scout[id]).map(id => CHARS[id].name).join('・') || 'なし'}</div></div>
+    <div class="note" style="margin:6px 2px">Liella!に覚えられたくせ：${E.topHabit(G) ? HABIT_TEXT[E.topHabit(G)] + '（次の作戦会議で対策してくる）' : 'まだない'}</div>
     <h4 class="kh">号令（明るいものが使える）</h4>${Object.entries(lines).map(([ln, cs]) => `<div class="kh small">${CMD_LINE[ln]}</div>${cs.map(row).join('')}`).join('')}
     <p class="note">号令ゲージは戦いの始めに${2 + (has.has('g_start') ? 1 : 0)}、毎ターン1ずつたまり（大きく削られると+1）、最大${5 + (has.has('g_max') ? 1 : 0)}。</p>`;
 }
@@ -702,6 +721,9 @@ function monIcons(s) {
   if (s.flyN) out.push(`<span class="chip blue">${icon('fly')}上空</span>`);
   if (s.keenN) out.push(`<span class="chip gold">${icon('keen')}見破り</span>`);
   if (s.pierceNext) out.push(`<span class="chip gold">${icon('pierce')}貫通</span>`);
+  if (s.roarN) out.push(`<span class="chip red">${icon('scared')}咆哮</span>`);
+  if (s.mimicN) out.push(`<span class="chip purple">${icon('reflect')}擬態</span>`);
+  if (s.fearN) out.push(`<span class="chip purple">${icon('scared')}恐怖</span>`);
   $('sc-mstat').innerHTML = out.join('');
 }
 // 号令のゲージと予約（予約したぶんはゲージから引いて見せる）
@@ -728,12 +750,12 @@ $('sc-cmd-btn').onclick = () => {
   for (const cid of G.maou.cmds) {
     const D = CMDS[cid]; if (!D || D.passive) continue;
     if (cid === 'trump') { for (const t of d.traits) opts.push({ id: 'trump:' + t, name: `切り札：${TRAITS[t].name}`, cost: D.cost, desc: TRUMP[t] }); continue; }
-    const now = (cid === 'aim_free' && (s.aim || 'free') === 'free') || (cid === 'aim_weak' && s.aim === 'weak') || (cid === 'aim_healer' && s.aim === 'healer') || (cid === 'stance_atk' && s.mst === 'atk') || (cid === 'stance_def' && s.mst === 'def') || (cid === 'stance_norm' && (s.mst || 'normal') === 'normal') || (cid === 'charge' && s.charge);
+    const now = (CMDS[cid].once && (s.once || []).includes(cid)) || (cid === 'mimic' && s.mimicN > 0) || (cid === 'aim_free' && (s.aim || 'free') === 'free') || (cid === 'aim_weak' && s.aim === 'weak') || (cid === 'aim_healer' && s.aim === 'healer') || (cid === 'stance_atk' && s.mst === 'atk') || (cid === 'stance_def' && s.mst === 'def') || (cid === 'stance_norm' && (s.mst || 'normal') === 'normal') || (cid === 'charge' && s.charge);
     opts.push({ id: cid, name: D.name, cost: D.cost, desc: D.desc, target: D.target, now });
   }
   const pips = n => `<span class="cpips">${Array.from({ length: n }, () => '<i></i>').join('') || '<small>0</small>'}</span>`;
   openSheet(`<h3 style="margin:0 0 4px">号令</h3><p class="note">ゲージ ${left}（次のターンから効く）。${play.cmdQ.length ? `予約中：${play.cmdQ.map(cmdLabel).join('・')}` : ''}</p>
-    <div class="cmd-list">${opts.map((o, i) => `<button class="cmd-opt" data-i="${i}" ${o.cost > left || o.now ? 'disabled' : ''}><b>${o.name}${o.now ? '<small>（いまこれ）</small>' : ''}</b>${pips(o.cost)}<small>${o.desc}</small></button>`).join('')}</div>
+    <div class="cmd-list">${opts.map((o, i) => `<button class="cmd-opt" data-i="${i}" ${o.cost > left || o.now ? 'disabled' : ''}><b>${o.name}${o.now ? `<small>（${CMDS[o.id]?.once ? '使った' : 'いまこれ'}）</small>` : ''}</b>${pips(o.cost)}<small>${o.desc}</small></button>`).join('')}</div>
     <div id="cmd-target"></div>
     ${play.cmdQ.length ? '<button class="btn ghost small" id="cmd-clear" style="margin-top:8px">予約を取り消す</button>' : ''}
     <p class="note">号令を覚えるには、戦いのあとの自由行動で「号令を覚える」を選びます。</p>`);

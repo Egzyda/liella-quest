@@ -337,3 +337,6 @@ button { touch-action: manipulation; }
 .free-grp { padding: 8px 0; border-bottom: 1px solid #2f2650; }
 .fg-h { font-size: 13px; color: var(--sub); margin-bottom: 5px; }
 .fg-faces { display: flex; flex-wrap: wrap; gap: 4px; }
+.chip.purple { color: #d6b8ff; }
+.aiwait-box { display: flex; align-items: center; gap: 10px; padding: 18px 4px; color: var(--sub); }
+.aiwait-box img { width: 44px; height: 44px; border-radius: 50%; object-fit: cover; animation: fade 1s ease-in-out infinite alternate; }

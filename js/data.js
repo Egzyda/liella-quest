@@ -207,7 +207,12 @@ export const CMDS = {
   trump: { name: '切り札', cost: 2, tier: 2, line: 'atk', req: 'charge', desc: '持っている特性をいま使う（全体攻撃・再生・反射・毒・怒り・飛行・貫通・見破り）' },
   scare: { name: '威嚇', cost: 2, tier: 1, line: 'mess', target: true, desc: '1人をすくませて1回休みにする（盾が得意な子には効きにくい）' },
   g_start: { name: '号令の準備', tier: 1, line: 'cmd', passive: true, desc: '戦いの始まりの号令ゲージ+1' },
-  g_max: { name: '号令の器', tier: 2, line: 'cmd', passive: true, req: 'g_start', desc: '号令ゲージの最大+1、たまる速さも少し上がる' },
+  g_max: { name: '号令の器', tier: 2, line: 'cmd', passive: true, req: 'g_start', desc: '号令ゲージの最大+1' },
+  roar: { name: '咆哮', cost: 4, tier: 3, line: 'aim', req: 'aim_pick', once: true, desc: '挑発・かばう・盾の構えを打ち消し、このターンは狙いが必ず通る（1戦1回）' },
+  combo: { name: '連撃', cost: 3, tier: 3, line: 'atk', req: 'trump', desc: 'このターン、もう1回動く' },
+  mimic: { name: '擬態', cost: 3, tier: 2, line: 'mess', req: 'scare', desc: '2ターンのあいだ効き目をごまかす（Liella!の図鑑にまちがった効き目が書かれる）' },
+  fear: { name: '恐怖', cost: 4, tier: 3, line: 'mess', req: 'mimic', once: true, desc: 'Liella!全員の攻撃を2ターン3割下げる（1戦1回）' },
+  g_rate: { name: '号令の嵐', tier: 3, line: 'cmd', passive: true, req: 'g_max', desc: '号令ゲージが毎ターン多くたまる（2ターンで+1多い）' },
 };
 export const CMD_START = ['aim_free', 'aim_weak', 'stance_atk', 'stance_def', 'stance_norm'];
 export const CMD_LINE = { aim: '狙い', stance: '構え', atk: '攻撃', mess: 'かく乱', cmd: '指揮' };
@@ -216,11 +221,27 @@ export const MAOU_ACTS = {
   learn: { name: '号令を覚える', desc: '新しい号令を1つ覚える' },
   power: { name: '力をためる', desc: '使える魔力+2' },
   scout: { name: '偵察', desc: '2人を選んで、得意・能力・今回の育ち方をすべて見る' },
-  assassin: { name: '刺客を送る', desc: '1人の体力を大きく削って疲れ+2（そばの2人も傷を負って疲れ+1）' },
+  eavesdrop: { name: '盗み聞き', desc: '今夜のLiella!の過ごし方（鍛えた中身・買い物）と、次の方針を全部聞く' },
+  rumor: { name: '噂を流す', desc: '「次の魔物は〇〇に弱い」という嘘を町に流す（分析が得意な子は見抜くことも）' },
+  assassin: { name: '刺客を送る', desc: '1人の体力を大きく削って疲れ+2（そばの3人も傷を負って疲れ+1）' },
 };
 export const MAOU_POWER_ACT = 2;
 // 切り札の中身（特性ごと）
 export const TRUMP = {
   sweep: '全体攻撃をいま放つ', regen: '体力を大きく回復する', reflect: '2回のあいだ魔法を必ず跳ね返す', poison: '全員に毒をまく',
   rage: 'いますぐ怒り状態になる', fly: '2ターン空高く舞い、武器（弓以外）を当たりにくくする', pierce: '次の一撃で守りも盾も完全に無視する', keen: '挑発を見破り、ねらいを必ず通す（2ターン）',
+};
+
+// ---------------- お金と装備（Liella!が自由行動で買う） ----------------
+export const GOLD = { start: 30, win: 26, lose: 18 };
+export const ITEMS = {
+  wpn: { name: '業物の武器', price: 40, max: 2, desc: 'いちばん得意な武器の得意度+1' },
+  armor: { name: 'よろい', price: 35, max: 2, desc: '守り・魔法の守り+12%' },
+  charm: { name: 'お守り', price: 22, desc: 'その属性の魔物の魔法で受けるダメージ-30%' },
+};
+// Liella!が覚える魔王のくせ（号令の使い方）
+export const HABIT_TEXT = {
+  aim_healer: '魔王は回復役ばかり狙ってくる', aim_pick: '魔王は1人に狙いをしぼってくる', aim_weak: '魔王は弱った子から狙ってくる',
+  charge: '魔王はよく力をためてくる', scare: '魔王は威嚇でこっちを止めてくる', stance_atk: '魔王は攻めの構えが多い', roar: '魔王は咆哮で盾を崩してくる',
+  fear: '魔王は恐怖でこっちの攻撃を下げてくる', mimic: '魔王は効き目をごまかしてくる', combo: '魔王は一気に連撃してくる', trump: '魔王は切り札を隠している',
 };

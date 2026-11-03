@@ -1,8 +1,8 @@
 // AI（作戦会議だけで使う）。頭脳は「ふつう（AIなし）／クラウドAI／PCのAI（Ollama）」
 // AIにはセリフを書かせない。数字の表を見て「誰が出るか・何で攻めるか」を選ばせ、理由を短く言わせるだけ。
 // 答えはプログラムが確かめ、おかしければルールで決める。
-import { IDS, CHARS, KEYS, keyName, ELEM, SHAPES, TRAITS } from './data.js?v=2026.11.03-23';
-import { apt, belief, available, charStats, lookName, mText } from './engine.js?v=2026.11.03-23';
+import { IDS, CHARS, KEYS, keyName, ELEM, SHAPES, TRAITS, HABIT_TEXT, ITEMS } from './data.js?v=2026.11.03-25';
+import { apt, belief, available, charStats, lookName, mText, topHabit, monStats } from './engine.js?v=2026.11.03-25';
 
 export const OLLAMA_URL = 'http://localhost:11434';
 export const OLLAMA_MODEL = 'gemma3:12b';
@@ -63,14 +63,16 @@ export const AI = {
     const rows = av.map(id => {
       const C = CHARS[id], P = G.party[id];
       const top = KEYS.map(k => [k, apt(G, id, k)]).sort((a, b) => b[1] - a[1]).slice(0, 4).map(([k, v]) => `${k}${v}`).join(' ');
-      return `${id}(${C.name}) Lv${P.lv} 疲れ${P.tired}/3 得意:${top} 回復${apt(G, id, 'heal')} 歌${apt(G, id, 'song')} 盾${apt(G, id, 'guard')} 分析${apt(G, id, 'scan')} 性格:慎重${C.p.careful} 無鉄砲${C.p.rash}`;
+      return `${id}(${C.name}) Lv${P.lv} 体力${Math.round((P.hpR ?? 1) * 100)}% 疲れ${P.tired}/3 得意:${top} 回復${apt(G, id, 'heal')} 歌${apt(G, id, 'song')} 盾${apt(G, id, 'guard')} 分析${apt(G, id, 'scan')} 性格:慎重${C.p.careful} 無鉄砲${C.p.rash}`;
     }).join('\n');
     const sys = 'あなたはRPGのパーティーの参謀です。表の数字（0〜10、大きいほど得意）を見て、次の戦いに出る4人と、主に使う攻撃を決めます。'
       + '答えはJSONだけで返します：{"team":["id","id","id","id"],"focus":"攻撃のキー","plan":"focus|explore|balanced","reason":"30文字以内の日本語の理由"}。'
       + 'focusは sword spear bow fist fire water wind earth light dark のどれか。効き目が分からないときは plan を explore にして、いろいろな攻撃を持つ人を選ぶ。'
-      + '効かないと分かっている攻撃は focus にしない。疲れが2以上の人はなるべく休ませる。回復できる人を1人入れると安全。';
+      + '効かないと分かっている攻撃は focus にしない。疲れが2以上の人・体力が減っている人はなるべく休ませる。回復できる人を1人入れると安全。'
+      + '魔王は戦闘中に号令（狙いの指示・ため・威嚇など）を出してくる。魔王のくせが分かっていれば、それに強い顔ぶれ（盾が得意な人など）にする。';
     const user = `敵の見た目：${lookName(d)}（${ELEM[d.elem].name}属性・${SHAPES[d.shape].name}）。会うのは${(b?.met || 0) + 1}回目、これまで${b?.wins || 0}勝${b?.losses || 0}敗。\n`
       + `図鑑で分かっている効き目：${know.length ? know.join('、') : 'なし'}\n分かっている能力：${traits.length ? traits.join('、') : 'なし'}\n`
+      + `魔王のくせ：${topHabit(G) ? HABIT_TEXT[topHabit(G)] : 'まだ分からない'}\n`
       + `出られる人：\n${rows}`;
     try {
       const out = await this.ask([{ role: 'system', content: sys }, { role: 'user', content: user }]);
@@ -110,6 +112,35 @@ export const AI = {
       if (!stance && !focus) return null;
       return { stance, focus, reason };
     } catch (e) { console.warn('AIの戦闘中の判断に失敗', e); return null; }
+  },
+  // 自由行動：1人ずつの過ごし方と、次に鍛える攻撃を決めさせる（無理なものはプログラムが直す）
+  async freePlan(G) {
+    if (!this.usable()) return null;
+    const d = G.lastD;
+    const rows = IDS.map(id => {
+      const C = CHARS[id], P = G.party[id];
+      const top = KEYS.map(k => [k, apt(G, id, k)]).sort((a, b) => b[1] - a[1]).slice(0, 3).map(([k, v]) => `${k}${v}`).join(' ');
+      return `${id}(${C.name}) Lv${P.lv} 体力${Math.round((P.hpR ?? 1) * 100)}% 疲れ${P.tired}/3${P.hurt ? ' ケガ' : ''} 鍛えるポイント${P.pts} 得意:${top} 分析${apt(G, id, 'scan')} 装備:武器+${P.gear?.wpn || 0} よろい${P.gear?.armor || 0} お守り${(P.gear?.charm || []).map(e => ELEM[e].name).join('') || 'なし'}`;
+    }).join('\n');
+    const know = d ? KEYS.map(k => { const x = belief(G, d, k); return x.src === 'known' || x.src === 'fact' ? `${k}:${mText(x.m)}` : null; }).filter(Boolean) : [];
+    const sys = 'あなたはRPGのパーティーの司令塔です。戦いのあとの自由時間に、仲間ひとりひとりの過ごし方と、次に鍛える攻撃を決めます。答えはJSONだけ：'
+      + '{"acts":{"id":"rest|train|shop|info|drill", ...11人ぶん},"policy":["攻撃のキー","攻撃のキー"],"reason":"30文字以内の日本語"}。'
+      + 'rest＝休む（体力・ケガ・疲れが全部戻る。ケガの人は必ずrest）、train＝鍛える（鍛えるポイントがある人だけ。policyの攻撃が伸びる）、shop＝装備を買う（お金があるとき。武器・よろい・お守り）、info＝情報集め（分析が高い人向け。敵の効き目がわかる）、drill＝自主練。'
+      + 'policy は sword spear bow fist fire water wind earth light dark から2つ。効いた攻撃や、得意な人が多い攻撃を伸ばすと強い。';
+    const user = `前の敵：${d ? lookName(d) : 'なし'}（結果：${G.lastOutcome === 'win' ? '勝ち' : '負け'}、${d ? (monStats(d).magShare >= 0.5 ? '魔法が多い' : '物理が多い') : ''}）\n図鑑の効き目：${know.join('、') || 'まだ分からない'}\n`
+      + `お金：${G.gold}（武器${ITEMS.wpn.price}・よろい${ITEMS.armor.price}・お守り${ITEMS.charm.price}）\n魔王のくせ：${topHabit(G) ? HABIT_TEXT[topHabit(G)] : 'まだ分からない'}\n仲間：\n${rows}`;
+    try {
+      const out = await this.ask([{ role: 'system', content: sys }, { role: 'user', content: user }], 420);
+      const s2 = out.indexOf('{'), e = out.lastIndexOf('}');
+      const j = JSON.parse(out.slice(s2, e + 1));
+      const acts = {};
+      for (const id of IDS) if (['rest', 'train', 'shop', 'info', 'drill'].includes(j.acts?.[id])) acts[id] = j.acts[id];
+      const policy = (j.policy || []).filter(k => KEYS.includes(k)).slice(0, 2);
+      let reason = String(j.reason || '').replace(/["「」]/g, '').slice(0, 40);
+      if (!/[ぁ-んァ-ヶ一-龥]/.test(reason)) reason = '';
+      if (!Object.keys(acts).length && !policy.length) return null;
+      return { acts, policy, reason };
+    } catch (e) { console.warn('AIの自由行動に失敗', e); return null; }
   },
   // 頭脳ごとの使い方：PCのAIはたくさん、クラウドAIは大事な場面だけ
   battleHooks() {

@@ -1,6 +1,6 @@
 // モンスターの見た目（SVG）。形・属性の色・数値で姿が変わる
 // 攻撃が高い→トゲや角、防御が高い→よろい、魔法防御が高い→魔法の輪、素早さ→風の線、体力→大きさ
-import { ELEM } from './data.js?v=2026.11.03-23';
+import { ELEM } from './data.js?v=2026.11.03-25';
 
 const shade = (hex, f) => {
   const n = parseInt(hex.slice(1), 16);
