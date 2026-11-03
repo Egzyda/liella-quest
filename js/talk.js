@@ -1,6 +1,6 @@
 // セリフ選び：キャラごとのセリフ集から選ぶ（同じセリフが続かない）。口調はAIに作らせない
-import { CHARS, callName, callYou } from './data.js?v=2026.11.03-18';
-import { LINES } from './lines/index.js?v=2026.11.03-18';
+import { CHARS, callName, callYou } from './data.js?v=2026.11.03-19';
+import { LINES } from './lines/index.js?v=2026.11.03-19';
 
 const recent = {};
 export const nameOf = id => CHARS[id]?.name || id;

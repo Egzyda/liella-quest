@@ -75,7 +75,7 @@ export const CHARS = {
     p: { careful: 5, rash: 4, curious: 5, pride: 3, logic: 5, bold: 5, kind: 8 },
   },
   keke: {
-    name: '可可', color: '#A0D8EF', role: '風の魔法と盾（タンクぅくぅ）', I: 'クゥクゥ',
+    name: '可可', color: '#A0D8EF', role: '風の魔法と盾', I: 'クゥクゥ',
     callYou: n => `${n}さん`,
     call: { kanon: 'かのん', chisato: '千砂都', sumire: 'すみれ', ren: 'レンレン', kinako: 'きなきな', mei: 'メーメー', shiki: 'シッキー', natsumi: 'ナッツ', margarete: 'マルマル', tomari: '冬毬' },
     base: { hp: 68, atk: 8, mag: 13, def: 11, mdef: 12, spd: 10 },

@@ -1,10 +1,10 @@
 // 画面と操作：タイトル・魔王の玉座・モンスター作り・作戦会議と戦闘の再生
-import { IDS, CHARS, charGear, ELEMS, ELEM, WEAPONS, WEAPON, KEYS, keyName, STATS, STAT, SHAPES, TRAITS, STAGES, RES_MULT } from './data.js?v=2026.11.03-18';
-import * as E from './engine.js?v=2026.11.03-18';
-import { monsterSVG } from './monster.js?v=2026.11.03-18';
-import { AI, OLLAMA_MODEL } from './llm.js?v=2026.11.03-18';
-import { say } from './talk.js?v=2026.11.03-18';
-import { VERSION } from './version.js?v=2026.11.03-18';
+import { IDS, CHARS, charGear, ELEMS, ELEM, WEAPONS, WEAPON, KEYS, keyName, STATS, STAT, SHAPES, TRAITS, STAGES, RES_MULT } from './data.js?v=2026.11.03-19';
+import * as E from './engine.js?v=2026.11.03-19';
+import { monsterSVG } from './monster.js?v=2026.11.03-19';
+import { AI, OLLAMA_MODEL } from './llm.js?v=2026.11.03-19';
+import { say } from './talk.js?v=2026.11.03-19';
+import { VERSION } from './version.js?v=2026.11.03-19';
 
 const $ = id => document.getElementById(id);
 const h = (tag, attrs = {}, html = '') => { const e = document.createElement(tag); for (const [k, v] of Object.entries(attrs)) { if (k === 'on') for (const [ev, fn] of Object.entries(v)) e.addEventListener(ev, fn); else if (k === 'style') e.style.cssText = v; else e.setAttribute(k, v); } if (html) e.innerHTML = html; return e; };
@@ -25,8 +25,11 @@ function show(id) { for (const s of document.querySelectorAll('.screen')) s.hidd
 function toast(t) { const el = $('toast'); el.textContent = t; el.classList.add('on'); clearTimeout(toast.t); toast.t = setTimeout(() => el.classList.remove('on'), 2600); }
 // top：上に出す（キーボードで隠れないように。入力欄があるとき）
 function openSheet(html, top = false) { $('sheet-content').innerHTML = html; $('sheet').classList.toggle('top', top); $('sheet').hidden = false; }
-$('sheet-close').onclick = () => { $('sheet').hidden = true; };
-$('sheet').onclick = e => { if (e.target.id === 'sheet') $('sheet').hidden = true; };
+// 窓を閉じたときにすること（戦闘中のメニューなら再開）
+let sheetClosed = null;
+function closeSheet() { $('sheet').hidden = true; const f = sheetClosed; sheetClosed = null; f?.(); }
+$('sheet-close').onclick = closeSheet;
+$('sheet').onclick = e => { if (e.target.id === 'sheet') closeSheet(); };
 
 // ---------------- タイトル ----------------
 function title() {
@@ -380,6 +383,7 @@ async function fight() {
   $('sc-party').innerHTML = '';
   $('sc-done').hidden = true; $('sc-skip').hidden = false;
   $('sc-cut').classList.remove('on');
+  $('sc-paused').hidden = true; $('sc-pause').textContent = 'Ⅱ'; $('sc-pause').hidden = false;
   speedUI();
   addEv({ t: 'narr', text: '― 作戦会議 ―', cls: 'round' });
   let ai = null;
@@ -395,7 +399,7 @@ async function fight() {
   const M = E.meeting(G, d, ai);
   play = { evs: [...M.ev], i: 0, timer: null, done: false, computing: true, idle: false, fast: false };
   step();
-  const onEvent = e => { if (!play) return; play.evs.push(e); if (play.idle) { play.idle = false; step(); } };
+  const onEvent = e => { if (!play) return; play.evs.push(e); if (play.idle && !play.paused) { play.idle = false; step(); } };
   const hooks = { onEvent, ...AI.battleHooks() };
   if (hooks.maxAI) hooks.tactic = (g, dd, st) => AI.tactic(g, dd, st);
   const res = await E.battle(G, d, M, hooks);
@@ -417,6 +421,7 @@ function delayOf(e) {
 }
 function step() {
   if (!play) return;
+  if (play.paused) { play.waiting = true; return; }
   if (play.i >= play.evs.length) { if (play.computing) { play.idle = true; return; } return finish(); }
   const e = play.evs[play.i++];
   render(e, !play.fast);
@@ -427,6 +432,7 @@ function finish() {
   if (!play || play.done) return;
   play.done = true; clearTimeout(play.timer);
   $('sc-skip').hidden = true; $('sc-done').hidden = false;
+  $('sc-pause').hidden = true; $('sc-paused').hidden = true;
   $('sc-cut').classList.remove('on');
   $('sc-log').scrollTop = $('sc-log').scrollHeight;
   if (play.result) setTimeout(() => showResult(play?.result), play.fast ? 150 : 700);
@@ -434,6 +440,7 @@ function finish() {
 // 戦いのあとのまとめ（魔力・期限・レベルアップ）
 function showResult(r) {
   if (!r) return;
+  sheetClosed = null;
   const nm = esc(G.pname || '');
   let head, cls;
   if (r.end === 'maou') { head = `魔王${nm}軍の勝ち！`; cls = 'win'; }
@@ -465,9 +472,42 @@ $('sc-skip').onclick = () => {
   if (!play) return;
   clearTimeout(play.timer);
   play.fast = true;
+  if (play.paused) { setPause(false); return; }
   if (!play.idle) step();
 };
 $('sc-done').onclick = () => { play = null; hub(); };
+// 一時停止：止めている間は次の出来事を出さない（計算は裏で進む）
+function setPause(on) {
+  if (!play || play.done) on = false;
+  if (play) {
+    play.paused = on;
+    if (on) clearTimeout(play.timer);
+    else {
+      play.waiting = false;
+      // 止めている間に届いた出来事があれば続きから。計算待ちならそのまま待つ
+      if (play.i < play.evs.length || !play.computing) { play.idle = false; step(); }
+      else play.idle = true;
+    }
+  }
+  $('sc-pause').textContent = on ? '▶' : 'Ⅱ';
+  $('sc-pause').setAttribute('aria-label', on ? '再開' : '一時停止');
+  $('sc-paused').hidden = !on;
+}
+$('sc-pause').onclick = () => setPause(!play?.paused);
+// 戦闘中のメニュー（開いている間は止める）
+$('sc-menu').onclick = () => {
+  const was = !!play?.paused;
+  setPause(true);
+  openSheet(`<h3 style="margin:0 0 12px">メニュー</h3>
+    <button class="btn" id="mn-resume">戦いにもどる</button>
+    <button class="btn ghost" id="mn-party">パーティーの得意</button>
+    <button class="btn ghost" id="mn-help">遊び方</button>`);
+  const back = () => { $('sheet').hidden = true; sheetClosed = null; setPause(was); };
+  sheetClosed = () => setPause(was);
+  $('mn-resume').onclick = back;
+  $('mn-party').onclick = () => { openParty(); sheetClosed = () => setPause(was); };
+  $('mn-help').onclick = () => { openSheet(HELP); sheetClosed = () => setPause(was); };
+};
 function speedUI() {
   for (const b of $('sc-speed').children) { b.classList.toggle('on', +b.dataset.s === set.speed); b.onclick = () => { set.speed = +b.dataset.s; save(); speedUI(); }; }
 }

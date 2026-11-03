@@ -254,3 +254,8 @@ button { touch-action: manipulation; }
 /* 入力欄のある窓は上に出す（iPhoneのキーボードで隠れないように） */
 .sheet.top { align-items: flex-start; padding: calc(16px + var(--safe-t)) 12px 0; }
 .sheet.top .sheet-body { border-radius: 18px; border: 1px solid var(--line); padding-bottom: 18px; }
+/* 戦闘中のメニュー・一時停止 */
+.sc-ib { position: absolute; top: calc(8px + var(--safe-t)); z-index: 6; width: 34px; height: 34px; font-size: 15px; background: #0008; border-color: #fff3; color: #fff; padding: 0; }
+.sc-menu { left: 10px; font-size: 18px; }
+.sc-pause { right: 10px; }
+.sc-paused { position: absolute; left: 50%; top: calc(14px + var(--safe-t)); transform: translateX(-50%); z-index: 6; background: #000a; color: #fff; font-size: 12px; padding: 4px 12px; border-radius: 12px; letter-spacing: 1px; }
