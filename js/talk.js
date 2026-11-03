@@ -1,6 +1,6 @@
 // セリフ選び：キャラごとのセリフ集から選ぶ（同じセリフが続かない）。口調はAIに作らせない
-import { CHARS, callName } from './data.js?v=2026.11.03-13';
-import { LINES } from './lines/index.js?v=2026.11.03-13';
+import { CHARS, callName, callYou } from './data.js?v=2026.11.03-17';
+import { LINES } from './lines/index.js?v=2026.11.03-17';
 
 const recent = {};
 export const nameOf = id => CHARS[id]?.name || id;
@@ -16,7 +16,7 @@ export function line(sp, key, vars = {}) {
   used.push(list.indexOf(t));
   if (used.length > Math.max(0, list.length - 1)) used.shift();
   return t.replace(/\{t\}/g, () => (vars.t ? callName(sp, vars.t) : ''))
-    .replace(/\{k\}/g, vars.k ?? '').replace(/\{e\}/g, vars.e ?? '').replace(/\{s\}/g, vars.s ?? '');
+    .replace(/\{k\}/g, vars.k ?? '').replace(/\{e\}/g, vars.e ?? '').replace(/\{s\}/g, vars.s ?? '').replace(/\{p\}/g, () => callYou(sp, vars.p));
 }
 
 export function say(sp, key, vars) {

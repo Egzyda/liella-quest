@@ -1,6 +1,6 @@
 // モンスターの見た目（SVG）。形・属性の色・数値で姿が変わる
 // 攻撃が高い→トゲや角、防御が高い→よろい、魔法防御が高い→魔法の輪、素早さ→風の線、体力→大きさ
-import { ELEM } from './data.js?v=2026.11.03-13';
+import { ELEM } from './data.js?v=2026.11.03-17';
 
 const shade = (hex, f) => {
   const n = parseInt(hex.slice(1), 16);
@@ -83,6 +83,9 @@ export function monsterSVG(d, { size = 180, hurt = false } = {}) {
   if (d.traits.includes('regen')) parts.push(`<g fill="#7dffa8" opacity=".85"><path d="M40 60 h8 v-8 h4 v8 h8 v4 h-8 v8 h-4 v-8 h-8Z"/><path d="M150 150 h6 v-6 h3 v6 h6 v3 h-6 v6 h-3 v-6 h-6Z"/></g>`);
   if (d.traits.includes('poison')) parts.push(`<g fill="#b45cff" opacity=".8"><ellipse cx="70" cy="176" rx="5" ry="7"/><ellipse cx="128" cy="180" rx="4" ry="6"/></g>`);
   if (d.traits.includes('reflect')) parts.push(`<path d="M160 120 L184 110 L186 150 L162 156Z" fill="#dff4ff" stroke="#6aa8c8" stroke-width="3" opacity=".9"/>`);
+  // 貫通：とがった角／見破り：ひたいの第三の目
+  if (d.traits.includes('pierce')) parts.push(`<path d="M100 ${foot - 128} L92 ${foot - 98} L108 ${foot - 98}Z" fill="#e8ecf4" stroke="${c.line}" stroke-width="3"/>`);
+  if (d.traits.includes('keen')) { const [ex, ey] = (EYES[d.shape] || EYES.slime)[0]; const [fx] = (EYES[d.shape] || EYES.slime)[1]; parts.push(`<g transform="translate(${(ex + fx) / 2} ${ey - 16})"><ellipse rx="7" ry="5" fill="#fff6c8" stroke="${c.line}" stroke-width="2"/><circle r="2.6" fill="#c0306a"/></g>`); }
   if (d.traits.includes('sweep')) parts.push(`<path d="M20 180 Q100 150 180 180" stroke="${c.dark}" stroke-width="4" fill="none" stroke-dasharray="3 7" opacity=".7"/>`);
   return `<svg viewBox="0 0 200 200" width="${size}" height="${size}" class="mon-svg">
     <defs><radialGradient id="${gid}" cx="40%" cy="35%" r="75%"><stop offset="0" stop-color="${c.light}"/><stop offset="1" stop-color="${c.fill}"/></radialGradient></defs>

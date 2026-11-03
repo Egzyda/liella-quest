@@ -1,8 +1,8 @@
 // AI（作戦会議だけで使う）。頭脳は「ふつう（AIなし）／クラウドAI／PCのAI（Ollama）」
 // AIにはセリフを書かせない。数字の表を見て「誰が出るか・何で攻めるか」を選ばせ、理由を短く言わせるだけ。
 // 答えはプログラムが確かめ、おかしければルールで決める。
-import { IDS, CHARS, KEYS, keyName, ELEM, SHAPES, TRAITS } from './data.js?v=2026.11.03-13';
-import { apt, belief, available, charStats, lookName, mText } from './engine.js?v=2026.11.03-13';
+import { IDS, CHARS, KEYS, keyName, ELEM, SHAPES, TRAITS } from './data.js?v=2026.11.03-17';
+import { apt, belief, available, charStats, lookName, mText } from './engine.js?v=2026.11.03-17';
 
 export const OLLAMA_URL = 'http://localhost:11434';
 export const OLLAMA_MODEL = 'gemma3:12b';
@@ -63,7 +63,7 @@ export const AI = {
     const rows = av.map(id => {
       const C = CHARS[id], P = G.party[id];
       const top = KEYS.map(k => [k, apt(G, id, k)]).sort((a, b) => b[1] - a[1]).slice(0, 4).map(([k, v]) => `${k}${v}`).join(' ');
-      return `${id}(${C.name}) Lv${P.lv} 疲れ${P.tired}/3 得意:${top} 回復${apt(G, id, 'heal')} 歌${apt(G, id, 'song')} かばう${apt(G, id, 'guard')} 分析${apt(G, id, 'scan')} 性格:慎重${C.p.careful} 無鉄砲${C.p.rash}`;
+      return `${id}(${C.name}) Lv${P.lv} 疲れ${P.tired}/3 得意:${top} 回復${apt(G, id, 'heal')} 歌${apt(G, id, 'song')} 盾${apt(G, id, 'guard')} 分析${apt(G, id, 'scan')} 性格:慎重${C.p.careful} 無鉄砲${C.p.rash}`;
     }).join('\n');
     const sys = 'あなたはRPGのパーティーの参謀です。表の数字（0〜10、大きいほど得意）を見て、次の戦いに出る4人と、主に使う攻撃を決めます。'
       + '答えはJSONだけで返します：{"team":["id","id","id","id"],"focus":"攻撃のキー","plan":"focus|explore|balanced","reason":"30文字以内の日本語の理由"}。'
@@ -95,7 +95,7 @@ export const AI = {
     const recent = st.recent.map(r => `${r.k}→${mText(r.m)}`).join('、');
     const sys = 'あなたはRPGのパーティーの参謀です。戦いの途中で、これからの方針を決めます。答えはJSONだけ：'
       + '{"stance":"attack|defend|normal|retreat","focus":"攻撃のキーかnull","reason":"25文字以内の日本語"}。'
-      + 'attack＝回復を減らして攻める、defend＝回復とかばうを優先、retreat＝逃げる（負けになるが全滅よりまし）。'
+      + 'attack＝回復を減らして攻める、defend＝回復と盾（挑発・かばう）を優先、retreat＝逃げる（負けになるが全滅よりまし）。'
       + 'focusは sword spear bow fist fire water wind earth light dark のどれか。効かないと分かっている攻撃は選ばない。';
     const user = `状況：${TRIG[st.trig]}。${st.round}ターン目。\n敵：${lookName(d)}。敵の残り体力の見た目：約${Math.round(st.monHp * 100)}%。\n`
       + `いまの方針：${st.stance}、主に使う攻撃：${st.focus || 'なし'}\n図鑑の効き目：${know.join('、') || 'まだ分からない'}\n最近の攻撃の手応え：${recent || 'なし'}\n仲間：\n${team}`;

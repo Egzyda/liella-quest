@@ -45,6 +45,8 @@ export const TRAITS = {
   poison: { name: '毒', cost: 4, desc: '攻撃した相手を毒にする' },
   rage: { name: '怒り', cost: 4, desc: '体力が半分を切ると攻撃が強くなる' },
   sweep: { name: '全体攻撃', cost: 6, desc: 'ときどき4人まとめて攻撃する' },
+  pierce: { name: '貫通', cost: 6, desc: '守りや盾の構えを無視してダメージを与える' },
+  keen: { name: '見破り', cost: 5, desc: '挑発に乗らず、回復役や弱った相手をねらう' },
 };
 
 // ステージ：戦い4つ（最後はボス）。魔力＝モンスターに使えるポイント。
@@ -53,16 +55,19 @@ export const STAGES = [
   { name: '草原', bg: 'plain', fights: [{ budget: 34, days: 3 }, { budget: 42, days: 3 }, { budget: 50, days: 4 }, { budget: 64, boss: true, days: 5 }] },
 ];
 // 魔王の成長：戦うたびに使える魔力が増える（撃退したときは多め）
-export const MAOU_GROW = { win: 2, lose: 1 };
+export const MAOU_GROW = { win: 3, lose: 1 };
 
 // Liella! 11人（呼び方は資料「口調一覧」と同じ）
 // base：体力・力・魔力・守り・魔法の守り・素早さ（レベル1のとき）
-// w：武器の得意度 / e：属性の得意度 / s：そのほかの得意度（heal 回復・song 歌で励ます・guard かばう・scan 分析）
+// w：武器の得意度 / e：属性の得意度 / s：そのほかの得意度（heal 回復・song 歌で励ます・guard 盾（挑発でねらいを集める・構え・かばう）・scan 分析）
+// 装備：はじめから得意な武器を持っている。盾が6以上の子は盾も持っている（charGear）
+// callYou：プレイヤー（魔王役）の呼び方（Liella! Wolf Night と同じ）
 // p：性格（careful 慎重・rash 無鉄砲・curious 試したがり・pride 自分の得意技にこだわる・logic 理屈で考える・bold 出たがり・kind 仲間思い）
 export const IDS = ['kanon', 'keke', 'chisato', 'sumire', 'ren', 'kinako', 'mei', 'shiki', 'natsumi', 'margarete', 'tomari'];
 export const CHARS = {
   kanon: {
     name: 'かのん', color: '#FF7F32', role: '歌で支える何でも屋', I: '私',
+    callYou: n => `${n}ちゃん`,
     call: { keke: '可可ちゃん', chisato: 'ちーちゃん', sumire: 'すみれちゃん', ren: '恋ちゃん', kinako: 'きな子ちゃん', mei: 'メイちゃん', shiki: '四季ちゃん', natsumi: '夏美ちゃん', margarete: 'マルガレーテちゃん', tomari: '冬毬ちゃん' },
     base: { hp: 62, atk: 11, mag: 12, def: 9, mdef: 10, spd: 10 },
     w: { sword: 6, spear: 3, bow: 4, fist: 2 }, e: { fire: 3, water: 3, wind: 4, earth: 2, light: 7, dark: 1 },
@@ -70,15 +75,17 @@ export const CHARS = {
     p: { careful: 5, rash: 4, curious: 5, pride: 3, logic: 5, bold: 5, kind: 8 },
   },
   keke: {
-    name: '可可', color: '#A0D8EF', role: '風の魔法と応援', I: 'クゥクゥ',
+    name: '可可', color: '#A0D8EF', role: '風の魔法と盾（タンクぅくぅ）', I: 'クゥクゥ',
+    callYou: n => `${n}さん`,
     call: { kanon: 'かのん', chisato: '千砂都', sumire: 'すみれ', ren: 'レンレン', kinako: 'きなきな', mei: 'メーメー', shiki: 'シッキー', natsumi: 'ナッツ', margarete: 'マルマル', tomari: '冬毬' },
-    base: { hp: 54, atk: 8, mag: 14, def: 7, mdef: 11, spd: 11 },
+    base: { hp: 68, atk: 8, mag: 13, def: 11, mdef: 12, spd: 10 },
     w: { sword: 2, spear: 3, bow: 4, fist: 3 }, e: { fire: 4, water: 2, wind: 8, earth: 1, light: 5, dark: 2 },
-    s: { heal: 2, song: 7, guard: 2, scan: 2 },
+    s: { heal: 2, song: 6, guard: 8, scan: 2 },
     p: { careful: 2, rash: 8, curious: 6, pride: 6, logic: 3, bold: 9, kind: 6 },
   },
   chisato: {
     name: '千砂都', color: '#FF8C90', role: '素早い格闘家', I: '私',
+    callYou: n => `${n}ちゃん`,
     call: { kanon: 'かのんちゃん', keke: '可可ちゃん', sumire: 'すみれちゃん', ren: '恋ちゃん', kinako: 'きな子ちゃん', mei: 'メイちゃん', shiki: '四季ちゃん', natsumi: '夏美ちゃん', margarete: 'マルガレーテちゃん', tomari: '冬毬ちゃん' },
     base: { hp: 60, atk: 14, mag: 7, def: 9, mdef: 7, spd: 16 },
     w: { sword: 3, spear: 3, bow: 2, fist: 9 }, e: { fire: 3, water: 2, wind: 5, earth: 2, light: 2, dark: 1 },
@@ -87,6 +94,7 @@ export const CHARS = {
   },
   sumire: {
     name: 'すみれ', color: '#74F466', role: '光の魔法と槍', I: '私',
+    callYou: n => `${n}`,
     call: { kanon: 'かのん', keke: '可可', chisato: '千砂都', ren: '恋', kinako: 'きな子', mei: 'メイ', shiki: '四季', natsumi: '夏美', margarete: 'マルガレーテ', tomari: '冬毬' },
     base: { hp: 58, atk: 11, mag: 13, def: 8, mdef: 10, spd: 10 },
     w: { sword: 2, spear: 6, bow: 3, fist: 1 }, e: { fire: 2, water: 1, wind: 3, earth: 2, light: 8, dark: 3 },
@@ -94,7 +102,8 @@ export const CHARS = {
     p: { careful: 3, rash: 6, curious: 3, pride: 9, logic: 4, bold: 9, kind: 4 },
   },
   ren: {
-    name: '恋', color: '#004CE3', role: '剣と水の魔法の剣士', I: 'わたくし',
+    name: '恋', color: '#004CE3', role: '剣と盾と水の魔法', I: 'わたくし',
+    callYou: n => `${n}さん`,
     call: { kanon: 'かのんさん', keke: '可可さん', chisato: '千砂都さん', sumire: 'すみれさん', kinako: 'きな子さん', mei: 'メイさん', shiki: '四季さん', natsumi: '夏美さん', margarete: 'マルガレーテさん', tomari: '冬毬さん' },
     base: { hp: 64, atk: 13, mag: 11, def: 11, mdef: 9, spd: 10 },
     w: { sword: 9, spear: 4, bow: 3, fist: 2 }, e: { fire: 2, water: 6, wind: 2, earth: 2, light: 3, dark: 1 },
@@ -102,7 +111,8 @@ export const CHARS = {
     p: { careful: 7, rash: 2, curious: 4, pride: 5, logic: 7, bold: 6, kind: 7 },
   },
   kinako: {
-    name: 'きな子', color: '#F6F052', role: '仲間を守る盾役', I: 'きな子',
+    name: 'きな子', color: '#F6F052', role: '仲間を守る盾役（一番の盾）', I: 'きな子',
+    callYou: n => `${n}先輩`,
     call: { kanon: 'かのん先輩', keke: 'クゥクゥ先輩', chisato: '千砂都先輩', sumire: 'すみれ先輩', ren: '恋先輩', mei: 'メイちゃん', shiki: '四季ちゃん', natsumi: '夏美ちゃん', margarete: 'マルガレーテちゃん', tomari: '冬毬ちゃん' },
     base: { hp: 80, atk: 11, mag: 7, def: 14, mdef: 10, spd: 6 },
     w: { sword: 2, spear: 5, bow: 2, fist: 6 }, e: { fire: 1, water: 3, wind: 2, earth: 7, light: 2, dark: 1 },
@@ -111,6 +121,7 @@ export const CHARS = {
   },
   mei: {
     name: 'メイ', color: '#E70F47', role: '火の力で押す攻め役', I: '私',
+    callYou: n => `${n}先輩`,
     call: { kanon: 'かのん先輩', keke: '可可先輩', chisato: '千砂都先輩', sumire: 'すみれ先輩', ren: '恋先輩', kinako: 'きな子', shiki: '四季', natsumi: '夏美', margarete: 'マルガレーテ', tomari: '冬毬' },
     base: { hp: 66, atk: 15, mag: 10, def: 10, mdef: 7, spd: 11 },
     w: { sword: 5, spear: 4, bow: 2, fist: 7 }, e: { fire: 8, water: 1, wind: 2, earth: 3, light: 1, dark: 2 },
@@ -119,6 +130,7 @@ export const CHARS = {
   },
   shiki: {
     name: '四季', color: '#9FE3DA', role: '分析と薬の研究者', I: '私',
+    callYou: n => `${n}先輩`,
     call: { kanon: 'かのん先輩', keke: '可可先輩', chisato: '千砂都先輩', sumire: 'すみれ先輩', ren: '恋先輩', kinako: 'きな子ちゃん', mei: 'メイ', natsumi: '夏美ちゃん', margarete: 'マルガレーテちゃん', tomari: '冬毬ちゃん' },
     base: { hp: 50, atk: 7, mag: 14, def: 7, mdef: 12, spd: 9 },
     w: { sword: 1, spear: 2, bow: 5, fist: 1 }, e: { fire: 4, water: 5, wind: 3, earth: 4, light: 1, dark: 6 },
@@ -126,15 +138,17 @@ export const CHARS = {
     p: { careful: 7, rash: 1, curious: 9, pride: 2, logic: 9, bold: 3, kind: 6 },
   },
   natsumi: {
-    name: '夏美', color: '#F653A2', role: '弓と道具の商人', I: '私',
+    name: '夏美', color: '#F653A2', role: '弓と盾の商人', I: '私',
+    callYou: n => `${n}先輩`,
     call: { kanon: 'かのん先輩', keke: '可可先輩', chisato: '千砂都先輩', sumire: 'すみれ先輩', ren: '恋先輩', kinako: 'きな子', mei: 'メイ', shiki: '四季', margarete: 'マルガレーテ', tomari: '冬毬' },
-    base: { hp: 56, atk: 12, mag: 9, def: 8, mdef: 8, spd: 13 },
+    base: { hp: 62, atk: 12, mag: 9, def: 10, mdef: 9, spd: 12 },
     w: { sword: 2, spear: 2, bow: 8, fist: 2 }, e: { fire: 2, water: 4, wind: 4, earth: 2, light: 2, dark: 4 },
-    s: { heal: 5, song: 4, guard: 2, scan: 5 },
+    s: { heal: 4, song: 4, guard: 6, scan: 5 },
     p: { careful: 6, rash: 4, curious: 5, pride: 4, logic: 6, bold: 7, kind: 4 },
   },
   margarete: {
     name: 'マルガレーテ', color: '#AF4993', role: '闇と炎の魔法使い', I: '私',
+    callYou: n => `${n}先輩`,
     call: { kanon: 'かのん', keke: '可可先輩', chisato: '千砂都先輩', sumire: 'すみれ先輩', ren: '恋先輩', kinako: 'きな子先輩', mei: 'メイ先輩', shiki: '四季先輩', natsumi: '夏美先輩', tomari: '冬毬' },
     base: { hp: 52, atk: 8, mag: 17, def: 7, mdef: 12, spd: 10 },
     w: { sword: 3, spear: 1, bow: 2, fist: 1 }, e: { fire: 6, water: 3, wind: 2, earth: 2, light: 2, dark: 9 },
@@ -143,6 +157,7 @@ export const CHARS = {
   },
   tomari: {
     name: '冬毬', color: '#57C0C7', role: '作戦を立てる参謀', I: '私',
+    callYou: n => `${n}先輩`,
     call: { kanon: 'かのん先輩', keke: '可可先輩', chisato: '千砂都先輩', sumire: 'すみれ先輩', ren: '恋先輩', kinako: 'きな子先輩', mei: 'メイ先輩', shiki: '四季先輩', natsumi: '姉者', margarete: 'マルガレーテ' },
     base: { hp: 54, atk: 10, mag: 13, def: 8, mdef: 10, spd: 11 },
     w: { sword: 3, spear: 3, bow: 6, fist: 1 }, e: { fire: 2, water: 7, wind: 4, earth: 3, light: 3, dark: 2 },
@@ -156,4 +171,13 @@ export function callName(sp, who) {
   if (!CHARS[sp]) return CHARS[who].name;
   if (sp === who) return CHARS[sp].I;
   return CHARS[sp].call[who] || CHARS[who].name;
+}
+
+// プレイヤー（魔王役）の呼び方
+export const callYou = (sp, name) => (CHARS[sp]?.callYou ? CHARS[sp].callYou(name || 'あなた') : name);
+// はじめから持っている装備：いちばん得意な武器（盾が6以上なら盾も）
+export function charGear(id) {
+  const C = CHARS[id];
+  const w = WEAPONS.slice().sort((a, b) => C.w[b] - C.w[a])[0];
+  return [WEAPON[w].name, ...(C.s.guard >= 6 ? ['盾'] : [])];
 }

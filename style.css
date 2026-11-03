@@ -232,3 +232,22 @@ button { touch-action: manipulation; }
 .krow .kn { width: 80px; }
 .krow .tg { display: inline-block; font-style: normal; font-size: 10px; font-weight: 700; padding: 1px 7px; border-radius: 8px; margin-top: 3px; }
 .krow.main .tg { background: #5a2a38; color: #ffc0ca; } .krow.thin .tg { background: #1f4a36; color: #b8ffd8; }
+/* 完全ランダム */
+.rand-row { display: flex; gap: 8px; align-items: center; }
+.rand-row .seg { flex: 1; }
+.rand-row .seg button { height: 38px; }
+.rand-row .btn { flex: none; height: 38px; }
+/* 戦いのあとのまとめ */
+.result h3 { text-align: center; font-size: 24px; margin: 4px 0 14px; }
+.result h3.win { color: var(--green); } .result h3.lose { color: var(--red); }
+.rs-row { display: grid; grid-template-columns: 76px 1fr auto; align-items: center; gap: 8px; padding: 10px 12px; margin: 6px 0; border: 1px solid var(--line); border-radius: 10px; background: var(--card); font-size: 14px; }
+.rs-row span { color: var(--sub); font-size: 12px; }
+.rs-row em { font-style: normal; color: var(--gold); }
+.rs-row small { font-weight: 800; font-size: 13px; }
+.rs-row small.win { color: var(--green); } .rs-row small.lose { color: var(--red); }
+.rs-ups { margin: 12px 0 6px; display: flex; flex-wrap: wrap; gap: 4px; }
+.rs-ups .label { width: 100%; margin: 0 0 2px; }
+.result .ev.say { margin: 14px 0 4px; }
+.result .btn-row { display: flex; gap: 8px; margin-top: 14px; }
+.result .btn-row .btn { margin: 0; }
+.result .btn-row .ghost { flex: 0 0 38%; }

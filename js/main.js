@@ -1,9 +1,10 @@
 // 画面と操作：タイトル・魔王の玉座・モンスター作り・作戦会議と戦闘の再生
-import { IDS, CHARS, ELEMS, ELEM, WEAPONS, WEAPON, KEYS, keyName, STATS, STAT, SHAPES, TRAITS, STAGES, RES_MULT } from './data.js?v=2026.11.03-13';
-import * as E from './engine.js?v=2026.11.03-13';
-import { monsterSVG } from './monster.js?v=2026.11.03-13';
-import { AI, OLLAMA_MODEL } from './llm.js?v=2026.11.03-13';
-import { VERSION } from './version.js?v=2026.11.03-13';
+import { IDS, CHARS, charGear, ELEMS, ELEM, WEAPONS, WEAPON, KEYS, keyName, STATS, STAT, SHAPES, TRAITS, STAGES, RES_MULT } from './data.js?v=2026.11.03-17';
+import * as E from './engine.js?v=2026.11.03-17';
+import { monsterSVG } from './monster.js?v=2026.11.03-17';
+import { AI, OLLAMA_MODEL } from './llm.js?v=2026.11.03-17';
+import { say } from './talk.js?v=2026.11.03-17';
+import { VERSION } from './version.js?v=2026.11.03-17';
 
 const $ = id => document.getElementById(id);
 const h = (tag, attrs = {}, html = '') => { const e = document.createElement(tag); for (const [k, v] of Object.entries(attrs)) { if (k === 'on') for (const [ev, fn] of Object.entries(v)) e.addEventListener(ev, fn); else if (k === 'style') e.style.cssText = v; else e.setAttribute(k, v); } if (html) e.innerHTML = html; return e; };
@@ -57,13 +58,27 @@ async function prepareAI() {
     return false;
   }
 }
-$('btn-continue').onclick = async () => { if (await prepareAI()) hub(); };
+$('btn-continue').onclick = async () => { if (!(await prepareAI())) return; if (!G.pname) askName(n => { G.pname = n; save(); hub(); }); else hub(); };
+// プレイヤーの名前（Liella!のみんなが呼ぶ名前。6文字まで）
+function askName(done) {
+  openSheet(`<div class="help"><h3>あなたの名前</h3><p class="note">Liella!のみんなが呼ぶ名前です（6文字まで）。魔王軍の名前にもなります。</p>
+    <div class="ed-row"><input id="pn" maxlength="6" value="${esc(set.pname || '')}" placeholder="なまえ" autocomplete="off"></div>
+    <button class="btn primary" id="pn-ok">これで始める</button></div>`);
+  const ok = () => { const n = $('pn').value.trim().slice(0, 6); if (!n) return toast('名前を入れてください'); set.pname = n; save(); $('pn').blur(); $('sheet').hidden = true; resetScroll(); done(n); };
+  $('pn-ok').onclick = ok;
+  $('pn').onkeydown = e => { if (e.key === 'Enter') ok(); };
+}
+function startNew() {
+  askName(n => {
+    G = E.newGame(); G.pname = n; save();
+    hub();
+    openSheet(`<div class="help"><h3>ログイン完了</h3><p>放課後、Liella!のみんなとフルダイブ型のVRゲーム「リエラクエスト」を遊ぶことになった。</p><p>みんなは勇者のパーティー。そして<b>${esc(n)}</b>は――<b>魔王</b>の役。</p><p>魔王${esc(n)}軍として草原にモンスターを置き、迎え撃とう。<b>イベントの期限まで草原を抜けさせなければ魔王の勝ち</b>。</p><p>みんなは作戦会議で4人を選び、戦いながら弱点を探し、負けても図鑑に書いて学んでくる。魔王も戦うたびに力（魔力）が増える。</p><p>まずは最初の1体を作ろう。</p></div>`);
+  });
+}
 $('btn-new').onclick = async () => {
-  if (G && !confirm('はじめからにしますか？（いまの旅の記録は消えます）')) return;
+  if (G && !confirm('はじめからにしますか？（いまの記録は消えます）')) return;
   if (!(await prepareAI())) return;
-  G = E.newGame(); save();
-  openSheet(`<div class="help"><h3>魔王、目覚める</h3><p>あなたは<b>魔王</b>。Liella!の11人が、あなたを倒すために旅立ちました。</p><p>道にモンスターを置いて迎え撃ち、<b>期限まで草原を抜けさせなければ魔王の勝ち</b>です。</p><p>彼女たちは作戦会議で4人を選び、戦いながら弱点を探し、負けても図鑑に書いて学んできます。魔王も戦うたびに力（魔力）が増えます。</p><p>まずは最初の1体を作りましょう。</p></div>`);
-  hub();
+  startNew();
 };
 $('btn-help').onclick = () => openSheet(HELP);
 // 最新版に更新：古いファイルが残っていても、全部読み直す
@@ -75,6 +90,7 @@ async function hardReload() {
 }
 $('btn-update').onclick = hardReload;
 const HELP = `<div class="help"><h3>遊び方</h3>
+<p><b>設定</b>：Liella!のみんなと、フルダイブ型のVRゲーム「リエラクエスト」で遊んでいます。みんなは勇者のパーティー、あなたは魔王の役です。</p>
 <p><b>勝ち負け</b>：あなたは魔王。草原（4戦・最後はボス）に向かってくるLiella!を迎え撃ちます。1回戦うと1日たち、<b>期限が0日になったら魔王の勝ち</b>。ボスまで倒されたら魔王の負けです。</p>
 <p><b>期限</b>：最初は2日。Liella!が1つ突破するたびに、次の戦いのぶんの日数が足されます（2戦目+3日・3戦目+3日・ボス+4日。残った日は持ちこし）。後の敵ほど強いので、Liella!が挑める回数も多くなります。</p>
 <p><b>魔王の成長</b>：戦うたびに使える魔力が増えます（撃退すると+3、突破されても+2）。レベルが上がっていくLiella!に負けないよう、増えた魔力でモンスターを強くしましょう。</p>
@@ -82,6 +98,10 @@ const HELP = `<div class="help"><h3>遊び方</h3>
 <p><b>モンスター作り</b>：能力（体力・攻撃・防御…）、効き目（弱点と耐性）、特性（再生・飛行…）を決める。能力は1ポイント＝魔力1で、どの能力も1ポイントでだいたい同じくらい強くなります（0〜15）。ただし防御は、片方だけ上げるとパーティーがもう片方（物理⇔魔法）で攻めてくるので、両方上げると効きます。弱点を作ると魔力が少し戻ります（最大9）。名前は「おまかせ」で形・属性・能力から自動で付きます。</p>
 <p><b>見た目と言い伝え</b>：パーティーは見た目（形と色）で判断します。火の色なら「水が効くはず」と思いこむので、そこを無効にしておくと引っかかります。同じ見た目で中身を変えると、前の記憶が通じず混乱します。</p>
 <p><b>パーティー</b>：11人それぞれ武器や属性の得意度（0〜10）、性格がちがいます。使った武器や魔法は少しずつ上達します。戦った人は疲れ、倒れた人は次の戦いを休みます。控えも経験値を半分もらえます。</p>
+<p><b>盾とねらわれやすさ</b>：モンスターは、目立つこと（強い攻撃・回復・歌）をした子をねらいやすくなります。盾が得意な子（きな子・可可・恋・夏美）は「挑発」で自分にねらいを集め、盾を構えてダメージを減らします。対抗するには特性の「見破り」（挑発に乗らず回復役や弱った子をねらう）や「貫通」（守りと盾を無視）を。</p>
+<p><b>外野の分析役</b>：控えに分析が得意な子（四季・冬毬など）がいると、戦いを見ていて弱点に気づいたり、作戦を変えたりします。</p>
+<p><b>装備</b>：みんなは、はじめから得意な武器（盾が得意な子は盾も）を持っています。</p>
+<p><b>ランダム</b>：モンスター作りの「ランダム」は、形・属性・能力・効き目・特性をすべてランダムに決めます（特性の数は選べます）。</p>
 <p><b>パーティーの一覧</b>：玉座のパーティーを「一覧表」「攻撃ごと」に切りかえると、11人の得意が一目でわかります。モンスター作りの「パーティー」ボタンからも開けます。得意な子が多い攻撃（主力）を効かなくすると困り、少ない攻撃（手薄）は弱点にしても突かれにくいです。</p>
 <p><b>図鑑</b>：パーティーが見て覚えたこと。会心の一撃を弱点と勘ちがいすることもあります（理屈っぽい人は割り引いて考える）。</p>
 <p><b>頭脳</b>：「ふつう」は性格と数字で考えます。クラウドAI・PCのAIは、作戦会議（出撃メンバーと作戦）と、戦闘中の大事な場面（ピンチ・予想外のこと）でAIが判断します。PCのAIは回数制限がないので、3ターンごとの見直しもAIがします（1回の戦闘で最大6回）。セリフはどのモードでも、キャラごとに用意したものです。</p></div>`;
@@ -92,15 +112,15 @@ function hub() {
   show('hub');
   const S = STAGES[G.stage], f = E.currentFight(G);
   $('hub-day').innerHTML = G.cleared || G.maouWin ? `${G.day - 1}日` : `期限まで<br><b style="color:var(--gold);font-size:15px">あと${E.daysLeft(G)}日</b>`;
-  $('hub-sub').textContent = `ステージ：${S.name}　魔王の力 +${G.power || 0}`;
+  $('hub-sub').textContent = `魔王${G.pname || ''}軍　${S.name}　力 +${G.power || 0}`;
   $('progress').innerHTML = S.fights.map((x, i) => `<div class="dot ${i < G.fight || G.cleared ? 'done' : i === G.fight ? 'now' : ''}">${x.boss ? 'ボス' : i + 1 + '戦目'}</div>`).join('');
   const card = $('next-card');
   if (G.maouWin) {
-    card.innerHTML = `<h3 class="win">魔王の勝ち！</h3><p class="note">Liella!は期限までに草原を抜けられず、旅をあきらめました。<br>（${S.fights.length}戦のうち${G.fight}戦を突破されただけ・撃退${G.history.filter(x => !x.win).length}回）</p><button class="btn" id="btn-restart">はじめから遊ぶ</button>`;
-    $('btn-restart').onclick = () => { if (confirm('はじめからにしますか？')) { G = E.newGame(); save(); hub(); } };
+    card.innerHTML = `<h3 class="win">魔王${esc(G.pname || '')}軍の勝ち！</h3><p class="note">Liella!は期限までに草原を抜けられず、旅をあきらめました。<br>（${S.fights.length}戦のうち${G.fight}戦を突破されただけ・撃退${G.history.filter(x => !x.win).length}回）</p><button class="btn" id="btn-restart">はじめから遊ぶ</button>`;
+    $('btn-restart').onclick = () => { if (confirm('はじめからにしますか？')) startNew(); };
   } else if (G.cleared) {
-    card.innerHTML = `<h3 class="lose">魔王の負け……草原を突破された</h3><p class="note">Liella!は${G.day - 1}日目に草原のボスを倒しました。（次のステージは、これから作ります）<br>撃退した回数：${G.history.filter(x => !x.win).length}回</p><button class="btn" id="btn-restart">はじめから遊ぶ</button>`;
-    $('btn-restart').onclick = () => { if (confirm('はじめからにしますか？')) { G = E.newGame(); save(); hub(); } };
+    card.innerHTML = `<h3 class="lose">魔王${esc(G.pname || '')}軍の負け……草原を突破された</h3><p class="note">Liella!は${G.day - 1}日目に草原のボスを倒しました。（次のステージは、これから作ります）<br>撃退した回数：${G.history.filter(x => !x.win).length}回</p><button class="btn" id="btn-restart">はじめから遊ぶ</button>`;
+    $('btn-restart').onclick = () => { if (confirm('はじめからにしますか？')) startNew(); };
   } else {
     const tries = G.tries[`${G.stage}-${G.fight}`] || 0;
     const d = G.next;
@@ -123,7 +143,7 @@ function tiredDots(n) { return `<span class="tired">${[0, 1, 2].map(i => `<i cla
 // ---------------- パーティーの見方（カード・一覧表・攻撃ごと） ----------------
 // 得意＝得意度6以上。休み（ケガ）の子は数えない
 const GOOD = 6;
-const SKILLS = [['heal', '回復'], ['song', '歌'], ['guard', 'かばう'], ['scan', '分析']];
+const SKILLS = [['heal', '回復'], ['song', '歌'], ['guard', '盾'], ['scan', '分析']];
 const ACOLS = [...WEAPONS.map(k => [k, WEAPON[k].name, 'w']), ...ELEMS.map(k => [k, ELEM[k].name, 'e']), ...SKILLS.map(([k, n]) => [k, n, 's'])];
 const baseApt = (id, k) => { const C = CHARS[id]; return WEAPON[k] ? C.w[k] : ELEM[k] ? C.e[k] : C.s[k] || 0; };
 // その攻撃が得意な子（休みを除く）。主力＝3人以上、手薄＝1人以下
@@ -190,10 +210,11 @@ function charSheet(id, back) {
   const bar = (label, k) => { const base = WEAPON[k] ? C.w[k] : ELEM[k] ? C.e[k] : C.s[k]; const a = E.apt(G, id, k); return `<div>${label}</div><div class="b"><i style="width:${base * 10}%"></i></div><div>${a}${a > base ? `<small style="color:var(--gold)">↑</small>` : ''}</div>`; };
   const PN = { careful: '慎重', rash: '無鉄砲', curious: '試したがり', pride: '得意技へのこだわり', logic: '理屈で考える', bold: '出たがり', kind: '仲間思い' };
   openSheet(`<div class="det-head" style="--c:${C.color}"><img src="${face(id)}" alt=""><div><b style="font-size:18px">${C.name}</b><div class="note">${C.role}<br>Lv${P.lv}（次まで ${40 * P.lv - P.exp}）　疲れ ${tiredDots(P.tired)}${P.hurt ? '　<span class="lose">ケガで休み</span>' : ''}</div></div></div>
+    <div class="note">装備：${charGear(id).join('・')}（はじめから持っている）</div>
     <div class="note">体力${st.maxHp}・力${Math.round(st.atk)}・魔力${Math.round(st.mag)}・守り${Math.round(st.def)}・魔法の守り${Math.round(st.mdef)}・素早さ${Math.round(st.spd)}</div>
     <h4>武器の得意度（0〜10、↑は使いこんで上達）</h4><div class="bars">${WEAPONS.map(k => bar(WEAPON[k].name, k)).join('')}</div>
     <h4>属性の得意度</h4><div class="bars">${ELEMS.map(k => bar(ELEM[k].name, k)).join('')}</div>
-    <h4>そのほか</h4><div class="bars">${[['回復', 'heal'], ['歌', 'song'], ['かばう', 'guard'], ['分析', 'scan']].map(([l, k]) => bar(l, k)).join('')}</div>
+    <h4>そのほか</h4><div class="bars">${[['回復', 'heal'], ['歌', 'song'], ['盾', 'guard'], ['分析', 'scan']].map(([l, k]) => bar(l, k)).join('')}</div>
     <h4>性格</h4><div class="bars">${Object.entries(C.p).map(([k, v]) => `<div>${PN[k]}</div><div class="b"><i class="m" style="width:${v * 10}%"></i></div><div>${v}</div>`).join('')}</div>${back ? '<button class="btn small ghost" id="sheet-back">‹ 一覧にもどる</button>' : ''}`);
   if (back) $('sheet-back').onclick = back;
 }
@@ -223,6 +244,7 @@ function renderLog() {
 let D = null, nameAuto = true;
 function editor() {
   show('editor');
+  document.querySelector('#editor .scroll').scrollTop = 0;
   const f = E.currentFight(G);
   D = JSON.parse(JSON.stringify(G.next || E.blankDesign()));
   if (!G.next && G.fight > 0) D.name = '';
@@ -241,6 +263,8 @@ function editor() {
   $('ed-back').onclick = () => hub();
   $('ed-party').onclick = $('ed-party2').onclick = () => openParty();
   $('ed-random').onclick = () => { D = randomDesign(f.budget, ''); nameAuto = true; edRender(true); };
+  randUI();
+  $('ed-rand').onclick = () => { D = fullRandom(f.budget, set.rn ?? -1); nameAuto = true; edRender(true); toast('ランダムで作りました'); };
   $('ed-ok').onclick = () => {
     if (E.costOf(D) > f.budget) return toast('魔力が足りません');
     D.name = (D.name || '').trim() || E.autoName(D);
@@ -295,6 +319,35 @@ function wireSlider(row, onSet) {
     setV(+r.min + (e.clientX - rc.left) / rc.width * (+r.max - +r.min));
   });
 }
+// 完全ランダム：形・属性・能力の振り分け・効き目・特性をすべてランダムに。n＝特性の数（-1ならおまかせ）。魔力はほぼ使い切る
+function randUI() {
+  const v = set.rn ?? -1;
+  $('ed-rn').innerHTML = [[-1, 'おまかせ'], [0, '0'], [1, '1'], [2, '2'], [3, '3']].map(([k, n]) => `<button data-v="${k}" class="${v === k ? 'on' : ''}">${n}</button>`).join('');
+  for (const b of $('ed-rn').children) b.onclick = () => { set.rn = +b.dataset.v; save(); randUI(); };
+}
+function fullRandom(budget, n) {
+  const R = Math.random, pick = a => a[Math.floor(R() * a.length)];
+  const d = E.blankDesign();
+  d.name = ''; d.shape = pick(Object.keys(SHAPES)); d.elem = pick(ELEMS);
+  for (const s of STATS) d.stats[s] = 0;
+  const tr = Object.keys(TRAITS).sort(() => R() - 0.5);
+  const cnt = n >= 0 ? n : Math.floor(R() * 3);
+  d.traits = tr.slice(0, cnt);
+  // 特性が高すぎるときは、安いものに入れかえる
+  while (E.costOf(d) > budget * 0.6 && d.traits.length) d.traits.pop();
+  for (const k of KEYS) if (R() < 0.3) d.res[k] = Math.floor(R() * 7) - 3 || 0;
+  for (const k of KEYS) if (!d.res[k]) delete d.res[k];
+  while (E.costOf(d) > budget * 0.8) { const ks = Object.keys(d.res).filter(k => d.res[k] > 0); if (!ks.length) break; delete d.res[pick(ks)]; }
+  // 残りの魔力を能力にランダムに振る
+  for (let i = 0; i < 400 && E.costOf(d) < budget; i++) {
+    const s = pick(STATS);
+    if (d.stats[s] >= 15) continue;
+    d.stats[s]++;
+    if (E.costOf(d) > budget) { d.stats[s]--; break; }
+  }
+  d.name = E.autoName(d);
+  return d;
+}
 function randomDesign(budget, name) {
   const R = Math.random, pick = a => a[Math.floor(R() * a.length)];
   let best = null;
@@ -337,6 +390,7 @@ async function fight() {
     wait.remove();
     if (AI.quotaOut) toast('クラウドAIの今日の無料枠を使い切りました。ここからは「ふつう」で考えます');
   }
+  const before = { power: G.power || 0, budget: E.currentFight(G).budget, days: E.daysLeft(G), lv: Object.fromEntries(IDS.map(id => [id, G.party[id].lv])) };
   const M = E.meeting(G, d, ai);
   play = { evs: [...M.ev], i: 0, timer: null, done: false, computing: true, idle: false, fast: false };
   step();
@@ -352,7 +406,7 @@ async function fight() {
   play.evs.push({ t: 'narr', text: '― 反省会 ―', cls: 'round' }, ...rv);
   if (G.maouWin) play.evs.push({ t: 'end', cls: 'win', text: '期限切れ！ Liella!は草原を抜けられなかった。魔王の勝ち！' });
   else if (G.cleared) play.evs.push({ t: 'end', cls: 'lose', text: `草原のボスまで倒された……魔王の負け（${G.day - 1}日目）` });
-  else play.evs.push({ t: 'narr', text: res.win ? `魔王の力が増した。次の戦いで使える魔力 ${E.currentFight(G).budget}（期限まであと${E.daysLeft(G)}日）` : `魔王の力が増した。使える魔力 ${E.currentFight(G).budget}（期限まであと${E.daysLeft(G)}日）` });
+  play.result = { win: res.win, before, after: G.cleared || G.maouWin ? null : { power: G.power || 0, budget: E.currentFight(G).budget, days: E.daysLeft(G) }, ups: IDS.filter(id => G.party[id].lv > before.lv[id]), end: G.maouWin ? 'maou' : G.cleared ? 'clear' : null, team: res.team };
   play.computing = false;
   if (play.idle) { play.idle = false; step(); }
 }
@@ -374,6 +428,36 @@ function finish() {
   $('sc-skip').hidden = true; $('sc-done').hidden = false;
   $('sc-cut').classList.remove('on');
   $('sc-log').scrollTop = $('sc-log').scrollHeight;
+  if (play.result) setTimeout(() => showResult(play?.result), play.fast ? 150 : 700);
+}
+// 戦いのあとのまとめ（魔力・期限・レベルアップ）
+function showResult(r) {
+  if (!r) return;
+  const nm = esc(G.pname || '');
+  let head, cls;
+  if (r.end === 'maou') { head = `魔王${nm}軍の勝ち！`; cls = 'win'; }
+  else if (r.end === 'clear') { head = `魔王${nm}軍の負け……`; cls = 'lose'; }
+  else if (r.win) { head = '突破された……'; cls = 'lose'; }
+  else { head = '撃退！'; cls = 'win'; }
+  let body = '';
+  if (r.after) {
+    const dp = r.after.power - r.before.power, dd = r.after.days - r.before.days;
+    body += `<div class="rs-row"><span>魔王の力</span><b>+${r.before.power} → <em>+${r.after.power}</em></b><small class="win">+${dp}</small></div>`;
+    body += `<div class="rs-row"><span>使える魔力</span><b>${r.win ? `次の敵は <em>${r.after.budget}</em>` : `${r.before.budget} → <em>${r.after.budget}</em>`}</b><small></small></div>`;
+    body += `<div class="rs-row"><span>期限</span><b>あと${r.before.days}日 → <em>あと${r.after.days}日</em></b><small class="${dd >= 0 ? 'win' : 'lose'}">${dd >= 0 ? '+' + dd : dd}日</small></div>`;
+    if (r.win) body += `<p class="note">次の戦いへ。突破されたぶん、期限が延びた。</p>`;
+    else if (r.after.days <= 2) body += `<p class="note">期限まであと少し。ここをしのげば魔王の勝ち！</p>`;
+  } else if (r.end === 'maou') body += `<p class="note">Liella!は期限までに草原を抜けられなかった。</p>`;
+  else body += `<p class="note">Liella!は草原のボスを倒した。</p>`;
+  if (r.ups.length) body += `<div class="rs-ups"><div class="label">レベルアップ（Liella!）</div>${r.ups.map(id => `<span class="kp hi"><img src="${face(id)}" alt="">${CHARS[id].name}<b>Lv${G.party[id].lv}</b></span>`).join('')}</div>`;
+  if (r.end && G.pname) {
+    const sp = r.team[Math.floor(Math.random() * r.team.length)];
+    const ln = say(sp, r.end === 'maou' ? 'end_lose' : 'end_clear', { p: G.pname });
+    body += `<div class="ev say" style="--c:${CHARS[sp].color}"><img src="${face(sp)}" alt=""><div class="bub"><div class="who">${CHARS[sp].name}</div>${esc(ln.text)}</div></div>`;
+  }
+  openSheet(`<div class="result"><h3 class="${cls}">${head}</h3>${body}<div class="btn-row"><button class="btn ghost" id="rs-log">記録を見る</button><button class="btn primary" id="rs-hub">玉座へ戻る</button></div></div>`);
+  $('rs-log').onclick = () => { $('sheet').hidden = true; };
+  $('rs-hub').onclick = () => { $('sheet').hidden = true; play = null; hub(); };
 }
 // 最後まで：AIを待っている間も、届いたものから一気に出す
 $('sc-skip').onclick = () => {

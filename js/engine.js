@@ -3,8 +3,8 @@
 // ・戦いはターン制。誰が何をするかは、性格と「図鑑」（これまでに見たこと）から決める
 // ・図鑑には見たことだけが書かれる（会心の一撃を「弱点」と勘ちがいすることもある）
 // ・負けたら町に戻って反省し、もう一度挑む
-import { ELEMS, ELEM, FOLK_WEAK, WEAPONS, WEAPON, KEYS, keyName, STATS, STAT, RES_MULT, SHAPES, TRAITS, STAGES, MAOU_GROW, IDS, CHARS } from './data.js?v=2026.11.03-13';
-import { say, nameOf } from './talk.js?v=2026.11.03-13';
+import { ELEMS, ELEM, FOLK_WEAK, WEAPONS, WEAPON, KEYS, keyName, STATS, STAT, RES_MULT, SHAPES, TRAITS, STAGES, MAOU_GROW, IDS, CHARS } from './data.js?v=2026.11.03-17';
+import { say, nameOf } from './talk.js?v=2026.11.03-17';
 
 export const rnd = { f: Math.random };
 const R = () => rnd.f();
@@ -16,7 +16,7 @@ const gauss = () => (R() + R() + R() - 1.5) / 1.5;
 export function newGame() {
   const party = {};
   for (const id of IDS) party[id] = { lv: 1, exp: 0, mast: {}, tired: 0, hurt: 0 };
-  return { v: 1, stage: 0, fight: 0, party, book: {}, designs: [], next: null, tries: {}, history: [], cleared: false, day: 1, limit: STAGES[0].fights[0].days, power: 0, maouWin: false };
+  return { v: 1, stage: 0, fight: 0, party, book: {}, designs: [], next: null, tries: {}, history: [], cleared: false, pname: '', day: 1, limit: STAGES[0].fights[0].days, power: 0, maouWin: false };
 }
 
 // ---------------- モンスター ----------------
@@ -55,7 +55,7 @@ export function monStats(d) {
 }
 // モンスターの名前（おまかせ）：属性・特性・目立つ能力・種族から組み立てる
 const NAME_ELEM = { fire: 'フレイム', water: 'アクア', wind: 'ウィンド', earth: 'ガイア', light: 'ホーリー', dark: 'ダーク' };
-const NAME_TRAIT = { fly: 'スカイ', regen: 'リジェネ', poison: 'ポイズン', reflect: 'ミラー', rage: 'バーサク', sweep: 'ストーム' };
+const NAME_TRAIT = { fly: 'スカイ', regen: 'リジェネ', poison: 'ポイズン', reflect: 'ミラー', rage: 'バーサク', sweep: 'ストーム', pierce: 'ブレイク', keen: 'シーカー' };
 const NAME_STAT = { hp: 'ジャイアント', atk: 'マッスル', mag: 'ウィザード', def: 'アイアン', mdef: 'ルーン', spd: 'ソニック' };
 const NAME_SHAPE = { slime: 'スライム', beast: 'ビースト', bird: 'ガルーダ', golem: 'ゴーレム', ghost: 'ゴースト', dragon: 'ドラゴン', knight: 'ナイト' };
 export function autoName(d) {
@@ -120,13 +120,18 @@ function bookOf(G, d) {
 export function bookEntry(G, d) { return G.book[lookKey(d)] || null; }
 // 見た目から思いこむ効き目（言い伝え）
 // 形ごとの思いこみ（スライムは斬れる・鳥は弓・ゴーレムは拳で砕く…）
+// 体がない亡霊に武器は効きにくい・硬いゴーレムに剣や矢は通りにくい・よろいの騎士はすき間を槍で突く…（ふつうの人が思いそうなことだけ）
 const FOLK_SHAPE = {
-  slime: { fist: 0.7, sword: 0.85, spear: 0.85, fire: 1.3 }, beast: { spear: 1.35, bow: 1.15 }, bird: { bow: 1.45, fist: 0.8 },
-  golem: { fist: 1.35, sword: 0.75, bow: 0.75 }, ghost: { sword: 0.7, spear: 0.7, bow: 0.7, fist: 0.7, light: 1.3 },
-  dragon: { spear: 1.3, sword: 1.1 }, knight: { fist: 1.3, sword: 0.8 },
+  slime: { fist: 0.7, sword: 0.85, spear: 0.85, fire: 1.3 },
+  beast: { spear: 1.3, bow: 1.15, fire: 1.2 },
+  bird: { bow: 1.45, fist: 0.7, sword: 0.85 },
+  golem: { sword: 0.7, bow: 0.6, spear: 0.8, fist: 0.85, water: 1.25 },
+  ghost: { sword: 0.5, spear: 0.5, bow: 0.5, fist: 0.4, light: 1.45 },
+  dragon: { spear: 1.3, bow: 0.85, fist: 0.7 },
+  knight: { spear: 1.25, sword: 0.8, fist: 0.6, bow: 0.8 },
 };
 // 思いこみの理由（形からか、色＝属性からか）
-const FOLK_SHAPE_TEXT = { slime: 'ぷよぷよしたスライム', beast: '獣', bird: '空の鳥', golem: '硬いゴーレム', ghost: '亡霊', dragon: '大きなドラゴン', knight: 'よろいの騎士' };
+const FOLK_SHAPE_TEXT = { slime: 'ぷよぷよしたスライム', beast: '獣', bird: '空を飛ぶ鳥', golem: '岩のゴーレム', ghost: '体のない亡霊', dragon: '大きなドラゴン', knight: 'よろいの騎士' };
 export function folkText(d, k) {
   if (ELEM[k] && FOLK_WEAK[d.elem] === k) return `${ELEM[d.elem].name}の魔物なら、${keyName(k)}が効くはず……！`;
   return `${FOLK_SHAPE_TEXT[d.shape] || SHAPES[d.shape].name}なら、${keyName(k)}が効きそう……！`;
@@ -210,7 +215,7 @@ export function meeting(G, d, ai = null) {
     const needHeal = A.losses > 0 || !A.met || d.stats.atk + d.stats.mag >= 10;
     const healer = scored.filter(x => apt(G, x.id, 'heal') >= 5).sort((a, b) => apt(G, b.id, 'heal') - apt(G, a.id, 'heal'))[0];
     if (needHeal && healer) team.push(healer.id);
-    if (A.losses > 0) { const tank = scored.find(x => apt(G, x.id, 'guard') >= 6 && !team.includes(x.id)); if (tank) team.push(tank.id); }
+    if ((A.losses > 0 || d.stats.atk + d.stats.mag >= 10) && !A.b?.traits?.keen) { const tank = scored.filter(x => apt(G, x.id, 'guard') >= 6 && !team.includes(x.id)).sort((a, b) => b.v + apt(G, b.id, 'guard') * 2 - a.v - apt(G, a.id, 'guard') * 2)[0]; if (tank) team.push(tank.id); }
     const untested = id => KEYS.filter(k => apt(G, id, k) >= 5 && ['none', 'folk'].includes(belief(G, d, k).src));
     const covered = new Set(team.flatMap(untested));
     while (team.length < 4) {
@@ -262,7 +267,13 @@ export async function battle(G, d, M, hooks = {}) {
   const st = {}, hp = {}, used = {}, poison = {}, thinkLast = {}, saidWeak = new Set(), saidRes = new Set(), lowSaid = new Set();
   const bench = available(G).filter(id => !team.includes(id));
   let buff = 0, guardBy = null, swaps = 0, scanDone = 0;
-  const join = id => { st[id] = charStats(G, id); hp[id] = st[id].maxHp; used[id] = used[id] || {}; };
+  // ヘイト（モンスターからのねらわれやすさ）。目立つことをするほど上がり、ターンごとに少し下がる
+  const hate = {}, shield = {};
+  let taunt = { id: null, left: 0 }, benchSaid = 0;
+  const tauntSaid = new Set();
+  const join = id => { st[id] = charStats(G, id); hp[id] = st[id].maxHp; used[id] = used[id] || {}; hate[id] = 8 + R() * 4; };
+  // 外野の分析役：控えの中でいちばん分析が得意な子（6以上）
+  const analystOf = () => bench.filter(id => apt(G, id, 'scan') >= 6).sort((a, b) => apt(G, b, 'scan') - apt(G, a, 'scan'))[0] || null;
   team.forEach(join);
   const snap = () => ({ mon: mon.hp, max: mon.max, team: team.slice(), hp: { ...hp }, max2: Object.fromEntries(team.map(id => [id, st[id].maxHp])) });
   const push = e => { const x = { ...e, s: snap() }; ev.push(x); hooks.onEvent?.(x); };
@@ -286,8 +297,8 @@ export async function battle(G, d, M, hooks = {}) {
       let m = bl.m;
       m = 1 + (m - 1) * (1 - P.rash / 20);         // 無鉄砲な人は効き目をあまり気にしない
       let v = dmgOf(k) * m;
-      let reason = bl.src === 'known' || bl.src === 'fact' ? (m >= 1.2 ? 'known' : m <= 0.7 ? 'avoid' : 'best') : bl.src === 'folk' ? 'folk' : 'best';
-      if (k === M.focus) { v *= 1.25; reason = bl.src === 'known' ? 'known' : 'plan'; }
+      let reason = bl.src === 'known' || bl.src === 'fact' ? (m >= 1.2 ? 'known' : m <= 0.7 ? 'avoid' : 'best') : bl.src === 'folk' ? (bl.m > 1.05 ? 'folk' : bl.m < 0.95 ? 'folkbad' : 'best') : 'best';
+      if (k === M.focus) { v *= 1.25; reason = bl.src === 'known' ? 'known' : reason === 'folkbad' ? 'folkbad' : 'plan'; }
       const untested = bl.src === 'none' || bl.src === 'folk';
       if (untested && round <= 4 && a >= 3) {
         const ex = (P.curious / 10) * 0.35 + (M.plan === 'explore' ? 0.35 : 0);
@@ -306,6 +317,14 @@ export async function battle(G, d, M, hooks = {}) {
     }
     if (!buff && apt(G, id, 'song') >= 5 && round <= 3 && alive().length >= 3) opts.push({ type: 'song', v: avgDmg * alive().length * 0.32 * (apt(G, id, 'song') / 10) * 1.6, reason: 'song' });
     if (allyLow && allyLow !== id && apt(G, id, 'guard') >= 5 && guardBy !== id && hp[id] / s.maxHp > 0.5) opts.push({ type: 'guard', target: allyLow, v: ms.pow * 1.3 * (P.kind / 8) * (stance === 'defend' ? 1.6 : 1), reason: 'guard' });
+    // 盾：挑発してねらいを自分に集める（見破りを知っていたらしない）
+    const g = apt(G, id, 'guard');
+    if (g >= 6 && hp[id] / s.maxHp > 0.4 && alive().length >= 2 && !(taunt.id === id && taunt.left > 0) && !B.traits.keen) {
+      const top = alive().filter(x => x !== id).sort((a, b) => hate[b] - hate[a])[0];
+      const other = top && hate[top] >= hate[id] * 0.8;
+      const soft = top && hp[top] / st[top].maxHp < 0.7;
+      opts.push({ type: 'taunt', v: ms.pow * (g / 8) * (other ? 0.9 : 0.3) * (soft ? 1.4 : 1) * (stance === 'defend' ? 1.5 : 1) * (round === 1 ? 1.2 : 1), reason: 'taunt' });
+    }
     const unknown = KEYS.filter(k => B.res[k] == null).length + (B.stats.hp == null ? 1 : 0);
     if (apt(G, id, 'scan') >= 4 && unknown > 3 && round <= 3 && scanDone < 2) opts.push({ type: 'scan', v: avgDmg * (0.6 + P.logic * 0.08) * (M.plan === 'explore' ? 1.4 : 1), reason: 'scan' });
     // 自分が役に立てないなら、控えと交代
@@ -330,6 +349,7 @@ export async function battle(G, d, M, hooks = {}) {
       else if (inBook.has(k)) think(id, 'known', `図鑑によると、${keyName(k)}がよく効くはず。`);
       else think(id, 'known', `さっきの${keyName(k)}がよく効いていた。続けて狙おう。`);
     } else if (o.reason === 'folk') think(id, 'folk', folkText(d, k));
+    else if (o.reason === 'folkbad') think(id, 'folkbad', `${keyName(k)}は効きにくそうだけど……試してみる。`);
     else if (o.reason === 'explore') { think(id, 'explore', `まだ試していない${keyName(k)}を試してみよう。`); if (R() < 0.4) push(say(id, 'try', { k: keyName(k) })); }
     else if (o.reason === 'plan') think(id, 'plan', `作戦どおり、${keyName(k)}で攻める。`);
     else if (o.reason === 'avoid') think(id, 'avoid', `${keyName(k)}は効きが悪いけど……ほかに手がない。`);
@@ -363,6 +383,7 @@ export async function battle(G, d, M, hooks = {}) {
     const base = power(G, id, k, s) * (buff ? 1.15 : 1);
     const dmg = Math.max(rm === 0 ? 0 : 1, Math.round(base * rm * df * ran * (crit ? 1.5 : 1)));
     mon.hp = Math.max(0, mon.hp - dmg);
+    hate[id] += dmg * 0.5;
     // 見えた効き目を図鑑に書く（理屈派は会心の一撃を割り引いて考える）
     let seen = (dmg / base) / (crit && CHARS[id].p.logic >= 7 ? 1.5 : 1);
     const o2 = B.obs[k];
@@ -393,6 +414,7 @@ export async function battle(G, d, M, hooks = {}) {
     if (o.type === 'heal') {
       const amt = Math.round(st[id].mag * (0.6 + apt(G, id, 'heal') * 0.12) * 1.6);
       hp[o.target] = Math.min(st[o.target].maxHp, hp[o.target] + amt);
+      hate[id] += amt * 0.7;
       used[id].heal = (used[id].heal || 0) + 1;
       const self = o.target === id;
       if (!self && R() < 0.6) push(say(id, 'heal', { t: o.target }));
@@ -401,9 +423,17 @@ export async function battle(G, d, M, hooks = {}) {
       return;
     }
     if (o.type === 'song') {
-      buff = 3; used[id].song = (used[id].song || 0) + 1;
+      buff = 3; used[id].song = (used[id].song || 0) + 1; hate[id] += 12;
       push(say(id, 'song', {}));
       push({ t: 'buff', sp: id, text: `${nameOf(id)}の歌声が響く。みんなの力が上がった！` });
+      return;
+    }
+    if (o.type === 'taunt') {
+      used[id].guard = (used[id].guard || 0) + 1;
+      taunt = { id, left: 3 }; shield[id] = 3;
+      hate[id] = Math.max(...alive().map(x => hate[x])) + 20 + apt(G, id, 'guard') * 3;
+      if (!tauntSaid.has(id) || R() < 0.25) { tauntSaid.add(id); push(say(id, 'taunt', {})); }
+      push({ t: 'buff', sp: id, text: `${nameOf(id)}は盾を構えて、${d.name}の注意を引きつけた！` });
       return;
     }
     if (o.type === 'guard') {
@@ -452,8 +482,10 @@ export async function battle(G, d, M, hooks = {}) {
     const al = alive(); if (!al.length) return;
     const useMag = R() < ms.magShare;
     const pw = ms.pow * (mon.raged ? 1.5 : 1) * (useMag ? MON.magX : 1);
+    const pierce = d.traits.includes('pierce');
     const hitOne = (id, mult) => {
-      const defv = useMag ? st[id].mdef : st[id].def;
+      // 貫通：守りを6割無視し、盾の構え・かばうの軽減もなし
+      const defv = (useMag ? st[id].mdef : st[id].def) * (pierce ? 0.4 : 1);
       let dm = Math.max(1, Math.round(pw * 1.7 * (30 / (30 + defv * 1.5)) * mult * (0.85 + R() * 0.3)));
       hp[id] = Math.max(0, hp[id] - dm);
       return dm;
@@ -464,10 +496,35 @@ export async function battle(G, d, M, hooks = {}) {
       push({ t: 'mon', text: `${d.name}の全体攻撃！ ${parts.join('、')}のダメージ！` });
       for (const id of al) if (hp[id] <= 0) down(id);
     } else {
-      let target = al.sort(() => R() - 0.5).sort((a, b) => (hp[a] / st[a].maxHp) - (hp[b] / st[b].maxHp) + (R() - 0.5))[0];
-      let txt = '';
-      if (guardBy && hp[guardBy] > 0 && guardBy !== target) { txt = `${nameOf(guardBy)}がかばった！ `; target = guardBy; }
-      const dm = hitOne(target, guardBy === target ? 0.7 : 1);
+      let target, txt = '';
+      const tauntOn = taunt.left > 0 && hp[taunt.id] > 0;
+      if (d.traits.includes('keen')) {
+        // 見破り：挑発は無視。回復役か、いちばん弱っている子をねらう
+        const healer = al.filter(id => apt(G, id, 'heal') >= 5).sort((a, b) => apt(G, b, 'heal') - apt(G, a, 'heal'))[0];
+        target = healer && R() < 0.5 ? healer : al.slice().sort((a, b) => hp[a] / st[a].maxHp - hp[b] / st[b].maxHp)[0];
+        if (tauntOn && target !== taunt.id && !B.traits.keen) {
+          B.traits.keen = true; surpriseFlag = true;
+          push({ t: 'mon', text: `${d.name}は挑発に乗らない！ ${nameOf(target)}をねらっている！` });
+          think(taunt.id, 'keen', '挑発が効いていない……！ 見破られている。');
+        }
+      } else if (tauntOn && R() < 0.85) target = taunt.id;
+      else {
+        // ヘイトの高い子ほどねらわれやすい（少し気まぐれ）
+        const w = al.map(id => Math.pow(Math.max(1, hate[id]), 1.3) * (0.7 + R() * 0.6));
+        let x = R() * w.reduce((a, b) => a + b, 0);
+        target = al[al.length - 1];
+        for (let i = 0; i < al.length; i++) { x -= w[i]; if (x <= 0) { target = al[i]; break; } }
+      }
+      if (guardBy && hp[guardBy] > 0 && guardBy !== target && guardBy !== taunt.id) { txt = `${nameOf(guardBy)}がかばった！ `; target = guardBy; }
+      let mult = 1;
+      if (!pierce) {
+        if (guardBy === target) mult *= 0.7;
+        if (shield[target] > 0) { mult *= 1 - apt(G, target, 'guard') * 0.035; shield[target]--; }
+      } else if ((shield[target] > 0 || guardBy === target) && !B.traits.pierce) {
+        B.traits.pierce = true; surpriseFlag = true;
+        txt += '盾ごと貫いた！ ';
+      }
+      const dm = hitOne(target, mult);
       push({ t: 'mon', sp: target, text: `${d.name}の${useMag ? '魔法' : '攻撃'}！ ${txt}${nameOf(target)}に${dm}のダメージ！` });
       if (d.traits.includes('poison') && hp[target] > 0 && !poison[target] && R() < 0.6) {
         poison[target] = 3; B.traits.poison = true;
@@ -481,7 +538,7 @@ export async function battle(G, d, M, hooks = {}) {
   // 作戦の見直し。AIの答え → なければルール
   async function tactic(trig, round) {
     const al = alive();
-    const strat = [...al].sort((a, b) => apt(G, b, 'scan') + CHARS[b].p.logic - apt(G, a, 'scan') - CHARS[a].p.logic)[0];
+    const strat = analystOf() || [...al].sort((a, b) => apt(G, b, 'scan') + CHARS[b].p.logic - apt(G, a, 'scan') - CHARS[a].p.logic)[0];
     const leader = [...al].sort((a, b) => CHARS[b].p.careful - CHARS[a].p.careful)[0];
     if (!strat) return null;
     let t = null, byAI = false;
@@ -567,6 +624,21 @@ export async function battle(G, d, M, hooks = {}) {
       push({ t: 'mon', text: `${d.name}は怒り狂っている！ 攻撃が激しくなった！` });
     }
     if (buff) buff--;
+    for (const id of team) hate[id] = (hate[id] || 0) * 0.8;
+    if (taunt.left > 0) taunt.left--;
+    // 外野の分析役：控えから見て気づいたことを言う（3ターンごと・1戦で3回まで）
+    const an = analystOf();
+    if (an && round % 3 === 0 && benchSaid < 3) {
+      benchSaid++;
+      const hint = Object.entries(B.obs).filter(([k, o]) => o.v >= 1.25 && k !== M.focus && Math.max(...alive().map(x => apt(G, x, k))) >= 4).sort((a, b) => b[1].v - a[1].v)[0];
+      if (R() < apt(G, an, 'scan') * 0.07) {
+        const r = reveal();
+        if (r) { push(say(an, 'bench_find', { s: r })); push({ t: 'scan', sp: an, text: `図鑑に書いた：${r}` }); }
+      } else if (hint) {
+        M.focus = hint[0]; M.plan = 'focus';
+        push(say(an, 'bench_hint', { k: keyName(hint[0]) }));
+      }
+    }
     // 大事な場面：作戦を見直す（AIがあればAIに聞く）
     const downNow = team.length - alive().length;
     const avgHp = alive().reduce((a, x) => a + hp[x] / st[x].maxHp, 0) / Math.max(1, alive().length);
@@ -653,6 +725,7 @@ export function review(G, d, res) {
     else ev.push(say(sp, 'review_lose', {}));
     const left = daysLeft(G);
     if (left > 0 && left <= 3) ev.push({ t: 'narr', text: `魔王が完全な力を取り戻すまで、あと${left}日。` });
+    if (G.pname && R() < 0.4) ev.push(say(pick(res.team), 'maou_note', { p: G.pname }));
     const hurt = IDS.filter(id => G.party[id].hurt);
     if (hurt.length) ev.push({ t: 'narr', text: `${hurt.map(nameOf).join('・')}はケガで次の戦いを休む。` });
   }
