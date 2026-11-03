@@ -1,9 +1,9 @@
 // 画面と操作：タイトル・魔王の玉座・モンスター作り・作戦会議と戦闘の再生
-import { IDS, CHARS, ELEMS, ELEM, WEAPONS, WEAPON, KEYS, keyName, STATS, STAT, SHAPES, TRAITS, STAGES, RES_MULT } from './data.js?v=2026.11.03-3';
-import * as E from './engine.js?v=2026.11.03-3';
-import { monsterSVG } from './monster.js?v=2026.11.03-3';
-import { AI, OLLAMA_MODEL } from './llm.js?v=2026.11.03-3';
-import { VERSION } from './version.js?v=2026.11.03-3';
+import { IDS, CHARS, ELEMS, ELEM, WEAPONS, WEAPON, KEYS, keyName, STATS, STAT, SHAPES, TRAITS, STAGES, RES_MULT } from './data.js?v=2026.11.03-4';
+import * as E from './engine.js?v=2026.11.03-4';
+import { monsterSVG } from './monster.js?v=2026.11.03-4';
+import { AI, OLLAMA_MODEL } from './llm.js?v=2026.11.03-4';
+import { VERSION } from './version.js?v=2026.11.03-4';
 
 const $ = id => document.getElementById(id);
 const h = (tag, attrs = {}, html = '') => { const e = document.createElement(tag); for (const [k, v] of Object.entries(attrs)) { if (k === 'on') for (const [ev, fn] of Object.entries(v)) e.addEventListener(ev, fn); else if (k === 'style') e.style.cssText = v; else e.setAttribute(k, v); } if (html) e.innerHTML = html; return e; };
@@ -181,10 +181,10 @@ function edRender(full) {
     for (const b of $('ed-shape').children) b.onclick = () => { D.shape = b.dataset.k; edRender(true); };
     $('ed-elem').innerHTML = ELEMS.map(k => `<button data-k="${k}" class="${D.elem === k ? 'on' : ''}"><span class="sw" style="background:${ELEM[k].color}"></span>${ELEM[k].name}</button>`).join('');
     for (const b of $('ed-elem').children) b.onclick = () => { D.elem = b.dataset.k; edRender(true); };
-    $('ed-stats').innerHTML = STATS.map(s => `<div class="sl"><span>${STAT[s].name}</span><input type="range" min="0" max="10" step="1" value="${D.stats[s]}" data-s="${s}"><span class="v" id="sv-${s}"></span></div>`).join('');
-    for (const r of $('ed-stats').querySelectorAll('input')) r.oninput = () => { D.stats[r.dataset.s] = +r.value; edRender(false); };
-    $('ed-res').innerHTML = KEYS.map(k => `<div class="sl"><span>${keyName(k)}</span><input type="range" min="-3" max="3" step="1" value="${D.res[k] || 0}" data-k="${k}"><span class="v" id="rv-${k}"></span></div>`).join('');
-    for (const r of $('ed-res').querySelectorAll('input')) r.oninput = () => { const v = +r.value; if (v) D.res[r.dataset.k] = v; else delete D.res[r.dataset.k]; edRender(false); };
+    $('ed-stats').innerHTML = STATS.map(s => sliderRow(STAT[s].name, 0, 10, D.stats[s], `sv-${s}`)).join('');
+    $('ed-stats').querySelectorAll('.sl').forEach((row, i) => wireSlider(row, v => { D.stats[STATS[i]] = v; edRender(false); }));
+    $('ed-res').innerHTML = KEYS.map(k => sliderRow(keyName(k), -3, 3, D.res[k] || 0, `rv-${k}`)).join('');
+    $('ed-res').querySelectorAll('.sl').forEach((row, i) => wireSlider(row, v => { if (v) D.res[KEYS[i]] = v; else delete D.res[KEYS[i]]; edRender(false); }));
     $('ed-traits').innerHTML = Object.entries(TRAITS).map(([k, t]) => `<label class="trait"><input type="checkbox" data-k="${k}" ${D.traits.includes(k) ? 'checked' : ''}><span><b>${t.name}</b>（魔力${t.cost}）<small>${t.desc}</small></span></label>`).join('');
     for (const c of $('ed-traits').querySelectorAll('input')) c.onchange = () => { D.traits = D.traits.filter(x => x !== c.dataset.k); if (c.checked) D.traits.push(c.dataset.k); edRender(false); };
   }
@@ -199,6 +199,21 @@ function edRender(full) {
   $('ed-cost-bar').parentElement.classList.toggle('over', over);
   $('ed-cost-note').textContent = over ? '魔力が足りません。どこかを下げてください。' : `見た目：${E.lookName(D)}`;
   $('ed-ok').disabled = over;
+}
+// シークバー：−/＋ボタンでも1つずつ動かせる。バーをタップした位置にも動く（iPhone はつまみしか動かせないため）
+const sliderRow = (label, min, max, v, vid) => `<div class="sl"><span>${label}</span><button class="pm" data-d="-1" aria-label="下げる">−</button><input type="range" min="${min}" max="${max}" step="1" value="${v}"><button class="pm" data-d="1" aria-label="上げる">＋</button><span class="v" id="${vid}"></span></div>`;
+function wireSlider(row, onSet) {
+  const r = row.querySelector('input');
+  const setV = v => { v = Math.max(+r.min, Math.min(+r.max, Math.round(v))); if (v === +r.value) return; r.value = v; onSet(v); };
+  r.oninput = () => onSet(+r.value);
+  for (const b of row.querySelectorAll('.pm')) b.onclick = () => setV(+r.value + +b.dataset.d);
+  let sx = 0, sy = 0;
+  r.addEventListener('pointerdown', e => { sx = e.clientX; sy = e.clientY; });
+  r.addEventListener('pointerup', e => {
+    if (Math.abs(e.clientX - sx) > 8 || Math.abs(e.clientY - sy) > 8) return;
+    const rc = r.getBoundingClientRect();
+    setV(+r.min + (e.clientX - rc.left) / rc.width * (+r.max - +r.min));
+  });
 }
 function randomDesign(budget, name) {
   const R = Math.random, pick = a => a[Math.floor(R() * a.length)];
@@ -328,6 +343,12 @@ function render(e, anim) {
   if ((e.t === 'mon' || e.t === 'hurt') && e.sp) { const el = $('sp-' + e.sp); if (el) { el.classList.remove('hit'); void el.offsetWidth; el.classList.add('hit'); } }
   if (e.t === 'win') $('sc-mon').classList.add('dead');
 }
+
+// ---------------- iPhone：キーボードを閉じたあと、画面がずれたまま（タップの位置がずれる）にならないように ----------------
+function resetScroll() { if (window.scrollY || window.scrollX) window.scrollTo(0, 0); }
+document.addEventListener('focusout', () => setTimeout(resetScroll, 60));
+window.addEventListener('scroll', () => { const a = document.activeElement; if (!a || a.tagName !== 'INPUT' || a.type === 'range') resetScroll(); });
+window.visualViewport?.addEventListener('resize', () => setTimeout(resetScroll, 60));
 
 // ---------------- 起動 ----------------
 load();
