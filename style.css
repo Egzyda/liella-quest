@@ -1,7 +1,7 @@
 :root {
   --bg: #140f22; --bg2: #1f1833; --card: #261e3d; --line: #3d3260; --text: #ece6ff; --sub: #a99fcb;
   --gold: #f2c35a; --accent: #a46bff; --red: #ff5d73; --green: #5fe0a0;
-  --safe-b: env(safe-area-inset-bottom, 0px); --safe-t: env(safe-area-inset-top, 0px);
+  --safe-b: env(safe-area-inset-bottom, 0px); --safe-t: calc(env(safe-area-inset-top, 0px) * 1.6);
 }
 * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
 html, body { margin: 0; height: 100%; overflow: hidden; background: var(--bg); color: var(--text); font-family: "M PLUS Rounded 1c", system-ui, sans-serif; font-size: 15px; overscroll-behavior: none; }

@@ -3,8 +3,8 @@
 // ・戦いはターン制。誰が何をするかは、性格と「図鑑」（これまでに見たこと）から決める
 // ・図鑑には見たことだけが書かれる（会心の一撃を「弱点」と勘ちがいすることもある）
 // ・負けたら町に戻って反省し、もう一度挑む
-import { ELEMS, ELEM, FOLK_WEAK, WEAPONS, WEAPON, KEYS, keyName, STATS, STAT, RES_MULT, SHAPES, TRAITS, STAGES, IDS, CHARS } from './data.js?v=2026.11.03-7';
-import { say, nameOf } from './talk.js?v=2026.11.03-7';
+import { ELEMS, ELEM, FOLK_WEAK, WEAPONS, WEAPON, KEYS, keyName, STATS, STAT, RES_MULT, SHAPES, TRAITS, STAGES, IDS, CHARS } from './data.js?v=2026.11.03-8';
+import { say, nameOf } from './talk.js?v=2026.11.03-8';
 
 export const rnd = { f: Math.random };
 const R = () => rnd.f();
