@@ -1,12 +1,12 @@
 // 画面と操作：タイトル・魔王の玉座・モンスター作り・作戦会議と戦闘の再生
-import { HABIT_TEXT, ITEMS, CMDS, CMD_LINE, MAOU_ACTS, TRUMP, GROW_KEYS, growText, baseApt as bApt, IDS, CHARS, charGear, ELEMS, ELEM, WEAPONS, WEAPON, KEYS, keyName, STATS, STAT, SHAPES, TRAITS, STAGES, RES_MULT } from './data.js?v=2026.11.03-25';
-import * as E from './engine.js?v=2026.11.03-25';
-import { monsterSVG } from './monster.js?v=2026.11.03-25';
-import { AI, OLLAMA_MODEL } from './llm.js?v=2026.11.03-25';
-import { icon } from './icons.js?v=2026.11.03-25';
-import { freePhase, learnable, rowText, decidePolicy } from './camp.js?v=2026.11.03-25';
-import { say } from './talk.js?v=2026.11.03-25';
-import { VERSION } from './version.js?v=2026.11.03-25';
+import { DESIGN_TEXT, HABIT_TEXT, ITEMS, CMDS, CMD_LINE, MAOU_ACTS, TRUMP, GROW_KEYS, growText, baseApt as bApt, IDS, CHARS, charGear, ELEMS, ELEM, WEAPONS, WEAPON, KEYS, keyName, STATS, STAT, SHAPES, TRAITS, STAGES, RES_MULT } from './data.js?v=2026.11.03-26';
+import * as E from './engine.js?v=2026.11.03-26';
+import { monsterSVG } from './monster.js?v=2026.11.03-26';
+import { AI, OLLAMA_MODEL } from './llm.js?v=2026.11.03-26';
+import { icon } from './icons.js?v=2026.11.03-26';
+import { freePhase, learnable, rowText, decidePolicy } from './camp.js?v=2026.11.03-26';
+import { say } from './talk.js?v=2026.11.03-26';
+import { VERSION } from './version.js?v=2026.11.03-26';
 
 const $ = id => document.getElementById(id);
 const h = (tag, attrs = {}, html = '') => { const e = document.createElement(tag); for (const [k, v] of Object.entries(attrs)) { if (k === 'on') for (const [ev, fn] of Object.entries(v)) e.addEventListener(ev, fn); else if (k === 'style') e.style.cssText = v; else e.setAttribute(k, v); } if (html) e.innerHTML = html; return e; };
@@ -74,11 +74,16 @@ function askName(done) {
   $('pn-ok').onclick = ok;
   $('pn').onkeydown = e => { if (e.key === 'Enter') ok(); };
 }
+// ゲームをまたいで残るLiella!の記憶（魔王のくせ）
+const MEM = 'lq-mem';
+const loadMem = () => { try { return JSON.parse(localStorage.getItem(MEM) || 'null'); } catch { return null; } };
+const saveMem = () => { try { localStorage.setItem(MEM, JSON.stringify(E.memoryOf(G))); } catch {} };
 function startNew() {
   askName(n => {
-    G = E.newGame(); G.pname = n; save();
+    const mem = loadMem();
+    G = E.newGame(mem); G.pname = n; save();
     hub();
-    openSheet(`<div class="help"><h3>ログイン完了</h3><p>放課後、Liella!のみんなとフルダイブ型のVRゲーム「リエラクエスト」を遊ぶことになった。</p><p>みんなは勇者のパーティー。そして<b>${esc(n)}</b>は――<b>魔王</b>の役。</p><p>魔王${esc(n)}軍として草原にモンスターを置き、迎え撃とう。<b>イベントの期限まで草原を抜けさせなければ魔王の勝ち</b>。</p><p>みんなは作戦会議で4人を選び、戦いながら弱点を探し、負けても図鑑に書いて学んでくる。魔王は戦闘中に「号令」で指示を出し、戦いのあとの自由行動で号令を覚えたり、偵察したりできる。</p><p>まずは最初の1体を作ろう。</p></div>`);
+    openSheet(`<div class="help"><h3>ログイン完了</h3><p>放課後、Liella!のみんなとフルダイブ型のVRゲーム「リエラクエスト」を遊ぶことになった。</p><p>みんなは勇者のパーティー。そして<b>${esc(n)}</b>は――<b>魔王</b>の役。</p><p>魔王${esc(n)}軍として草原にモンスターを置き、迎え撃とう。<b>イベントの期限まで草原を抜けさせなければ魔王の勝ち</b>。</p><p>みんなは作戦会議で4人を選び、戦いながら弱点を探し、負けても図鑑に書いて学んでくる。魔王は戦闘中に「号令」で指示を出し、戦いのあとの自由行動で号令を覚えたり、偵察したりできる。</p>${mem ? `<p class="note">Liella!は、前に魔王${esc(n)}と戦ったときのことを少し覚えている。同じ戦い方は読まれているかもしれない。</p>` : ''}<p>まずは最初の1体を作ろう。</p></div>`);
   });
 }
 $('btn-new').onclick = async () => {
@@ -106,7 +111,7 @@ const HELP = `<div class="help"><h3>遊び方</h3>
 <p><b>パーティー</b>：11人それぞれ武器や属性の得意度（0〜10）、性格がちがいます。使った武器や魔法は少しずつ上達します。戦った人は疲れ、倒れた人は次の戦いを休みます。控えも経験値を半分もらえます。</p>
 <p><b>号令</b>：戦闘中、モンスターの下の「号令」から指示を出せます（押すと一時停止）。号令ゲージ（金のひし形）を使い、次のターンから効きます。最初は「狙い（自由・弱った子）」と「構え（攻め・守り）」だけ。ため・威嚇・切り札・回復役ねらい、さらに咆哮・連撃・擬態・恐怖などは、自由行動で覚えます。「最後まで」で飛ばすと、おまかせで号令します。</p>
 <p><b>自由行動</b>：戦いのあと、Liella!は町で休む・鍛える・買い物（武器・よろい・お守り）・情報集め。魔王は1つだけ「号令を覚える」「力をためる」「偵察（2人を全部見る）」「盗み聞き（今夜の過ごし方と次の方針を全部聞く）」「噂を流す（〇〇に弱いという嘘）」「刺客（1人を大きく削る）」から選べます。</p>
-<p><b>魔王のくせ</b>：同じ号令ばかり使うと、Liella!が覚えて対策してきます（回復役狙いなら盾役が最初からかばう、ためなら身構える…）。魔王タブで、いま覚えられているくせが見られます。</p>
+<p><b>魔王のくせ</b>：同じ号令ばかり使ったり、同じような魔物ばかり作ったりすると、Liella!が覚えて対策してきます（回復役狙いなら盾役が最初からかばう、ためなら身構える、見た目の弱点をいつも消していると思いこみを信じなくなる、魔法の魔物が多いとお守りを買う…）。気づくかどうかは参謀しだいで、四季・冬毬のような理屈っぽい子ほど早く気づきます。覚えたことは次のゲームにも少し残ります。魔王タブで、いま覚えられているくせが見られます。</p>
 <p><b>体力は持ち越し</b>：Liella!は戦いで減った体力が休むまで戻りません（控えは少し回復）。削っておくと次の戦いで別の子が出てきます。</p>
 <p><b>見えるのは見たことだけ</b>：Liella!の得意は、戦いで使ったものと偵察した子だけわかります（「？」はまだ見ていない）。毎回、初期の育ち方が少しずつ違うので、最初の「育成会議」の話もヒントになります。</p>
 <p><b>盾とねらわれやすさ</b>：モンスターは、目立つこと（強い攻撃・回復・歌）をした子をねらいやすくなります。盾が得意な子（きな子・可可・恋・夏美）は「挑発」で自分にねらいを集め、盾を構えてダメージを減らします。対抗するには特性の「見破り」（挑発に乗らず回復役や弱った子をねらう）や「貫通」（守りと盾を無視）を。</p>
@@ -115,7 +120,7 @@ const HELP = `<div class="help"><h3>遊び方</h3>
 <p><b>ランダム</b>：モンスター作りの「ランダム」は、形・属性・能力・効き目・特性をすべてランダムに決めます（特性の数は選べます）。</p>
 <p><b>パーティーの一覧</b>：玉座のパーティーを「一覧表」「攻撃ごと」に切りかえると、11人の得意が一目でわかります。モンスター作りの「パーティー」ボタンからも開けます。得意な子が多い攻撃（主力）を効かなくすると困り、少ない攻撃（手薄）は弱点にしても突かれにくいです。</p>
 <p><b>図鑑</b>：パーティーが見て覚えたこと。会心の一撃を弱点と勘ちがいすることもあります（理屈っぽい人は割り引いて考える）。</p>
-<p><b>頭脳</b>：「ふつう」は性格と数字で考えます。クラウドAI・PCのAIは、作戦会議（出撃メンバーと作戦）と、戦闘中の大事な場面（ピンチ・予想外のこと）でAIが判断します。PCのAIは回数制限がないので、3ターンごとの見直しもAIがします（1回の戦闘で最大6回）。セリフはどのモードでも、キャラごとに用意したものです。</p></div>`;
+<p><b>頭脳</b>：おすすめは「ふつう」です（性格と数字で考え、魔王のくせも覚えます）。AIは「おまけ」で、判断に少し変化が出ます。強さはふつうとほぼ同じです。「ふつう」は性格と数字で考えます。クラウドAI・PCのAIは、作戦会議（出撃メンバーと作戦）と、戦闘中の大事な場面（ピンチ・予想外のこと）でAIが判断します。PCのAIは回数制限がないので、3ターンごとの見直しもAIがします（1回の戦闘で最大6回）。セリフはどのモードでも、キャラごとに用意したものです。</p></div>`;
 
 // ---------------- 魔王の玉座 ----------------
 let tab = 'party';
@@ -479,6 +484,7 @@ async function fight() {
   play.evs.push({ t: 'narr', text: '― 反省会 ―', cls: 'round' }, ...rv);
   if (G.maouWin) play.evs.push({ t: 'end', cls: 'win', text: '期限切れ！ Liella!は草原を抜けられなかった。魔王の勝ち！' });
   else if (G.cleared) play.evs.push({ t: 'end', cls: 'lose', text: `草原のボスまで倒された……魔王の負け（${G.day - 1}日目）` });
+  saveMem();
   if (!G.cleared && !G.maouWin) { G.phase = 'free'; save(); }
   play.result = { win: res.win, before, after: G.cleared || G.maouWin ? null : { power: G.power || 0, budget: E.currentFight(G).budget, days: E.daysLeft(G) }, ups: IDS.filter(id => G.party[id].lv > before.lv[id]), end: G.maouWin ? 'maou' : G.cleared ? 'clear' : null, team: res.team };
   play.computing = false;
@@ -693,7 +699,7 @@ function renderMaou() {
   const lines = {};
   for (const c of Object.keys(CMDS)) (lines[CMDS[c].line] ||= []).push(c);
   $('tab-maou').innerHTML = `<div class="card"><b>魔王${esc(G.pname || '')}軍</b><div class="note">力 +${G.power || 0}（戦うたび・「力をためる」で増える）／偵察ずみ：${IDS.filter(id => G.scout[id]).map(id => CHARS[id].name).join('・') || 'なし'}</div></div>
-    <div class="note" style="margin:6px 2px">Liella!に覚えられたくせ：${E.topHabit(G) ? HABIT_TEXT[E.topHabit(G)] + '（次の作戦会議で対策してくる）' : 'まだない'}</div>
+    <div class="note" style="margin:6px 2px">Liella!に覚えられたくせ：${[E.topHabit(G) && HABIT_TEXT[E.topHabit(G)], E.designHabit(G) && DESIGN_TEXT[E.designHabit(G)]].filter(Boolean).join('、') || 'まだない'}${E.topHabit(G) || E.designHabit(G) ? '（参謀が気づけば対策してくる。理屈っぽい参謀ほど気づきやすい）' : ''}<br>見た目の思いこみをどれだけ信じているか：${Math.round(E.folkTrust(G) * 100)}%${G.memGames ? `　／前のゲームの記憶あり（${G.memGames}回ぶん）` : ''}</div>
     <h4 class="kh">号令（明るいものが使える）</h4>${Object.entries(lines).map(([ln, cs]) => `<div class="kh small">${CMD_LINE[ln]}</div>${cs.map(row).join('')}`).join('')}
     <p class="note">号令ゲージは戦いの始めに${2 + (has.has('g_start') ? 1 : 0)}、毎ターン1ずつたまり（大きく削られると+1）、最大${5 + (has.has('g_max') ? 1 : 0)}。</p>`;
 }

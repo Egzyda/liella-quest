@@ -2,9 +2,9 @@
 // Liella!：休む（体力・ケガ・疲れが全部戻る）／鍛える（レベルアップのポイントを方針どおりに使う）／情報集め（図鑑が埋まる）／自主練（熟練度）
 // 買い物（お金 G.gold で装備を買う）。魔王（1回）：号令を覚える／力をためる／偵察（2人を全部見る）／盗み聞き／噂を流す／刺客
 // plan：AIが決めた過ごし方 { acts: { id: 'rest'|'train'|'shop'|'info'|'drill' }, policy: [攻撃,攻撃] }（おかしいところはルールで直す）
-import { IDS, CHARS, KEYS, WEAPONS, WEAPON, ELEM, keyName, RES_MULT, GROW_KEYS, growCap, CMDS, MAOU_POWER_ACT, ITEMS } from './data.js?v=2026.11.03-25';
-import { apt, belief, monStats, lookKey, revealText } from './engine.js?v=2026.11.03-25';
-import { nameOf } from './talk.js?v=2026.11.03-25';
+import { IDS, CHARS, KEYS, WEAPONS, WEAPON, ELEM, keyName, RES_MULT, GROW_KEYS, growCap, CMDS, MAOU_POWER_ACT, ITEMS } from './data.js?v=2026.11.03-26';
+import { apt, belief, monStats, lookKey, revealText, designHabit, favElem } from './engine.js?v=2026.11.03-26';
+import { nameOf } from './talk.js?v=2026.11.03-26';
 
 const R = () => Math.random();
 
@@ -45,11 +45,14 @@ export function learnable(G) {
 function shopList(G, rows) {
   const out = [];
   const d = G.lastD, magHeavy = d && monStats(d).magShare >= 0.5 && G.lastOutcome !== 'win';
+  // 魔王が魔法の魔物ばかり使うと覚えていたら、よく出る属性のお守りを先に買っておく
+  const fav = designHabit(G) === 'magic' ? favElem(G) : null;
   const fighters = rows.filter(o => o.act !== 'rest' && o.act !== 'train').map(o => o.id)
     .sort((a, b) => Math.max(...KEYS.map(k => apt(G, b, k))) - Math.max(...KEYS.map(k => apt(G, a, k))));
   for (const id of fighters.slice(0, 5)) {
     const g = G.party[id].gear;
     if (magHeavy && !g.charm.includes(d.elem)) out.push({ id, item: 'charm', el: d.elem });
+    else if (fav && !g.charm.includes(fav)) out.push({ id, item: 'charm', el: fav });
     else if (g.wpn < ITEMS.wpn.max) out.push({ id, item: 'wpn' });
     else if (apt(G, id, 'guard') >= 6 && g.armor < ITEMS.armor.max) out.push({ id, item: 'armor' });
   }

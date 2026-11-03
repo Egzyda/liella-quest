@@ -3,8 +3,8 @@
 // ・戦いはターン制。誰が何をするかは、性格と「図鑑」（これまでに見たこと）から決める
 // ・図鑑には見たことだけが書かれる（会心の一撃を「弱点」と勘ちがいすることもある）
 // ・負けたら町に戻って反省し、もう一度挑む
-import { ELEMS, ELEM, FOLK_WEAK, WEAPONS, WEAPON, KEYS, keyName, STATS, STAT, RES_MULT, SHAPES, TRAITS, STAGES, MAOU_GROW, IDS, CHARS, GROW_KEYS, baseApt, growWeight, growCap, CMDS, CMD_START, TRUMP, GOLD, ITEMS, HABIT_TEXT } from './data.js?v=2026.11.03-25';
-import { say, nameOf } from './talk.js?v=2026.11.03-25';
+import { ELEMS, ELEM, FOLK_WEAK, WEAPONS, WEAPON, KEYS, keyName, STATS, STAT, RES_MULT, SHAPES, TRAITS, STAGES, MAOU_GROW, IDS, CHARS, GROW_KEYS, baseApt, growWeight, growCap, CMDS, CMD_START, TRUMP, GOLD, ITEMS, HABIT_TEXT, DESIGN_TEXT } from './data.js?v=2026.11.03-26';
+import { say, nameOf } from './talk.js?v=2026.11.03-26';
 
 export const rnd = { f: Math.random };
 const R = () => rnd.f();
@@ -13,14 +13,50 @@ const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
 const gauss = () => (R() + R() + R() - 1.5) / 1.5;
 
 // ---------------- 新しい旅 ----------------
-export function newGame() {
+// mem：前のゲームで覚えた魔王のくせ（ゲームをまたいで少し残る）
+export function newGame(mem = null) {
   const party = {};
   for (const id of IDS) party[id] = { lv: 1, exp: 0, mast: {}, tired: 0, hurt: 0, hpR: 1, bonus: {}, pts: 0, picks: [], gear: { wpn: 0, wpnK: null, armor: 0, charm: [] } };
   const G = { v: 2, stage: 0, fight: 0, party, book: {}, designs: [], next: null, tries: {}, history: [], cleared: false, pname: '', day: 1, limit: STAGES[0].fights[0].days, power: 0, maouWin: false,
     maou: { cmds: CMD_START.slice() }, seen: {}, scout: {}, phase: null, policy: [], free: [], gold: GOLD.start, habit: {}, rumor: null };
   customize(G);
+  if (mem) {
+    for (const [k, v] of Object.entries(mem.habit || {})) G.habit[k] = v * 0.8;
+    const p = mem.prof || {};
+    G.prof = { n: (p.n || 0) * 0.8, folkTrap: (p.folkTrap || 0) * 0.8, mag: (p.mag || 0) * 0.8, traits: Object.fromEntries(Object.entries(p.traits || {}).map(([k, v]) => [k, v * 0.8])), elems: Object.fromEntries(Object.entries(p.elems || {}).map(([k, v]) => [k, v * 0.8])) };
+    G.memGames = mem.games || 1;
+  }
   return G;
 }
+// 次のゲームに残す記憶
+export const memoryOf = G => ({ habit: G.habit || {}, prof: G.prof || null, games: (G.memGames || 0) + 1 });
+// 作り方のくせを記録する（毎戦0.75倍に薄れる）
+function recordDesign(G, d) {
+  const p = G.prof || (G.prof = { n: 0, folkTrap: 0, mag: 0, traits: {}, elems: {} });
+  const dec = x => x * 0.75;
+  p.n = dec(p.n) + 1; p.folkTrap = dec(p.folkTrap); p.mag = dec(p.mag);
+  for (const k of Object.keys(p.traits)) p.traits[k] = dec(p.traits[k]);
+  for (const k of Object.keys(p.elems)) p.elems[k] = dec(p.elems[k]);
+  // 見た目どおりの弱点（属性の言い伝え・形の思いこみ）を耐性にしているか
+  const shapeKey = Object.entries(FOLK_SHAPE[d.shape] || {}).filter(([, m]) => m > 1).map(([k]) => k);
+  if ((d.res[FOLK_WEAK[d.elem]] || 0) >= 2 || shapeKey.some(k => (d.res[k] || 0) >= 2)) p.folkTrap += 1;
+  if (monStats(d).magShare >= 0.55) p.mag += 1;
+  for (const t of d.traits) p.traits[t] = (p.traits[t] || 0) + 1;
+  p.elems[d.elem] = (p.elems[d.elem] || 0) + 1;
+}
+// 見た目の思いこみをどれだけ信じるか（弱点を消されてばかりだと信じなくなる）
+export const folkTrust = G => { const p = G?.prof; if (!p || p.n < 1.5) return 1; return clamp(1.15 - (p.folkTrap / p.n) * 1.1, 0.25, 1); };
+// いちばん目立つ作り方のくせ
+export function designHabit(G) {
+  const p = G.prof; if (!p || p.n < 1.8) return null;
+  const c = [];
+  if (p.folkTrap / p.n >= 0.6) c.push(['folk_trap', p.folkTrap / p.n]);
+  if (p.mag / p.n >= 0.6) c.push(['magic', p.mag / p.n]);
+  for (const [t, v] of Object.entries(p.traits)) if (DESIGN_TEXT[t] && v / p.n >= 0.6) c.push([t, v / p.n]);
+  c.sort((a, b) => b[1] - a[1]);
+  return c[0]?.[0] || null;
+}
+export const favElem = G => Object.entries(G.prof?.elems || {}).sort((a, b) => b[1] - a[1])[0]?.[0] || null;
 // 初期カスタム：1人3ポイントを、伸びやすいところに入りやすく（たまに意外なところへ）上乗せする
 const pickW = (items, w) => { let x = R() * items.reduce((a, it) => a + w(it), 0); for (const it of items) { x -= w(it); if (x <= 0) return it; } return items[items.length - 1]; };
 export function customize(G) {
@@ -182,11 +218,13 @@ export function folkText(d, k, G) {
 }
 // 言い伝えのもと：属性からなら「水」、形からなら「スライム型」
 const folkWhy = (d, k) => (ELEM[k] && FOLK_WEAK[d.elem] === k ? ELEM[d.elem].name : SHAPES[d.shape].name + '型');
-function folkMult(d, k) {
+function folkMult(d, k, G) {
   let m = FOLK_SHAPE[d.shape]?.[k] || 1;
   if (ELEM[k] && FOLK_WEAK[d.elem] === k) m *= 1.35;
   if (k === d.elem) m *= 0.6;
-  return m;
+  // 魔王に何度も弱点を消されていると、思いこみを信じなくなる
+  const tr = folkTrust(G);
+  return Math.abs(m - 1) < 0.01 ? 1 : 1 + (m - 1) * tr;
 }
 // 効き目の見こみ。src：どこからそう思ったか（known 図鑑／fact 分析／folk 見た目／none わからない）
 export function belief(G, d, k) {
@@ -196,8 +234,8 @@ export function belief(G, d, k) {
   if (o && o.n > 0) return { m: o.v, src: 'known', n: o.n };
   // 魔王が流した噂（次の戦いだけ。見抜かれたら効かない）
   if (G.rumor && G.rumor.k === k && !G.rumor.seen) return { m: 1.45, src: 'folk', rumor: true };
-  const f = folkMult(d, k);
-  return { m: f, src: f !== 1 ? 'folk' : 'none' };
+  const f = folkMult(d, k, G);
+  return { m: f, src: Math.abs(f - 1) > 0.04 ? 'folk' : 'none' };
 }
 
 // ---------------- 作戦会議（誰が出るか・何で攻めるか） ----------------
@@ -230,6 +268,8 @@ export function meeting(G, d, ai = null) {
   const ev = [];
   const av = available(G);
   const strat = [...av].sort((a, b) => apt(G, b, 'scan') + CHARS[b].p.logic * 0.3 - (apt(G, a, 'scan') + CHARS[a].p.logic * 0.3))[0];
+  // 魔王の作り方のくせ（理屈派の参謀ほど気づきやすい）
+  const dh = (() => { const x = designHabit(G); return x && R() < 0.45 + CHARS[strat].p.logic * 0.055 ? x : null; })();
   // 噂：分析が得意な参謀は見抜くことがある
   if (G.rumor && !G.rumor.checked) {
     G.rumor.checked = true;
@@ -269,12 +309,14 @@ export function meeting(G, d, ai = null) {
       // 体力が減ったままの子・疲れた子は出しにくい（控えが出てくる理由）
       const hr = G.party[id].hpR ?? 1;
       let v = bk.v * (1 - 0.12 * G.party[id].tired) * (hr < 0.3 ? 0.15 : 0.35 + 0.65 * hr);
+      if (dh === 'fly' && apt(G, id, 'bow') >= 6) v *= 1.25;
+      if (dh === 'reflect' && !WEAPON[bk.k]) v *= 0.85;
       if (plan === 'explore') v *= 1 + CHARS[id].p.curious * 0.02 + apt(G, id, 'scan') * 0.02;
       why[id] = bk.k;
       return { id, v };
     }).sort((a, b) => b.v - a.v);
     team = [];
-    const needHeal = A.losses > 0 || !A.met || d.stats.atk + d.stats.mag >= 10;
+    const needHeal = A.losses > 0 || !A.met || d.stats.atk + d.stats.mag >= 10 || dh === 'sweep' || dh === 'poison';
     const healer = scored.filter(x => apt(G, x.id, 'heal') >= 5).sort((a, b) => apt(G, b.id, 'heal') - apt(G, a.id, 'heal'))[0];
     if (needHeal && healer) team.push(healer.id);
     if ((A.losses > 0 || d.stats.atk + d.stats.mag >= 10) && !A.b?.traits?.keen) { const tank = scored.filter(x => apt(G, x.id, 'guard') >= 6 && !team.includes(x.id)).sort((a, b) => b.v + apt(G, b.id, 'guard') * 2 - a.v - apt(G, a.id, 'guard') * 2)[0]; if (tank) team.push(tank.id); }
@@ -308,9 +350,14 @@ export function meeting(G, d, ai = null) {
     }
   }
   // 魔王のくせ：よく使われた号令に対策する（盾役を入れる・身構える…）
-  const habit = topHabit(G);
+  const notice = () => R() < 0.45 + CHARS[strat].p.logic * 0.055;
+  const habit = topHabit(G) && notice() ? topHabit(G) : null;
+  // 同じくせの話は3戦に1回まで（対策そのものは毎回する）
+  const said = G.saidHabit || (G.saidHabit = {}), nowN = G.history.length;
+  const fresh = k => { if (said[k] != null && nowN - said[k] < 3) return false; said[k] = nowN; return true; };
+  if (dh && fresh(dh)) ev.push(say(strat, 'habit_note', { k: DESIGN_TEXT[dh] }));
   if (habit) {
-    ev.push(say(strat, 'habit_note', { k: HABIT_TEXT[habit] }));
+    if (fresh(habit)) ev.push(say(strat, 'habit_note', { k: HABIT_TEXT[habit] }));
     if (['aim_healer', 'aim_pick', 'aim_weak', 'roar'].includes(habit) && !team.some(id => apt(G, id, 'guard') >= 6)) {
       const tank = av.filter(id => !team.includes(id) && apt(G, id, 'guard') >= 6 && (G.party[id].hpR ?? 1) > 0.4).sort((a, b) => apt(G, b, 'guard') - apt(G, a, 'guard'))[0];
       if (tank) team[team.length - 1] = tank;
@@ -319,7 +366,7 @@ export function meeting(G, d, ai = null) {
   ev.push({ t: 'team', team: team.slice(), text: `出撃：${team.map(nameOf).join('・')}` });
   for (const id of team) if (G.party[id].tired >= 2) ev.push(say(id, 'tired', {}));
   ev.push(say(team[0], 'go', {}));
-  return { team, focus, plan, strat, ev, why, habit };
+  return { team, focus, plan, strat, ev, why, habit, dh };
 }
 
 // ---------------- 戦闘 ----------------
@@ -330,6 +377,7 @@ export async function battle(G, d, M, hooks = {}) {
   const ev = [];
   const B = bookOf(G, d);
   B.met++;
+  recordDesign(G, d);
   // 戦う前から図鑑に書いてあった攻撃（この戦いで初めて見たものは「さっき見た」と言う）
   const inBook = new Set([...Object.keys(B.obs), ...Object.keys(B.res)]);
   const ms = monStats(d);
@@ -370,6 +418,7 @@ export async function battle(G, d, M, hooks = {}) {
     const tk = team.filter(id => apt(G, id, 'guard') >= 5).sort((a, b) => apt(G, b, 'guard') - apt(G, a, 'guard'))[0];
     if (tk) { guardBy = tk; push({ t: 'buff', sp: tk, text: `${nameOf(tk)}は最初から仲間の前に立ち、狙われそうな子をかばう構えをとった。` }); }
   } else if (habit === 'stance_atk' || habit === 'combo') stance = 'defend';
+  if (M.dh === 'regen' && stance === 'normal') stance = 'attack'; // 再生する魔物には一気に攻める
 
   const think = (id, reason, text) => { if (thinkLast[id] === reason + text) return; thinkLast[id] = reason + text; push({ t: 'think', sp: id, text }); };
 
