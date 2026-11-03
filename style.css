@@ -259,3 +259,6 @@ button { touch-action: manipulation; }
 .sc-menu { left: 10px; font-size: 18px; }
 .sc-pause { right: 10px; }
 .sc-paused { position: absolute; left: 50%; top: calc(14px + var(--safe-t)); transform: translateX(-50%); z-index: 6; background: #000a; color: #fff; font-size: 12px; padding: 4px 12px; border-radius: 12px; letter-spacing: 1px; }
+/* まだモンスターがいないとき：作るボタンを目立たせる */
+.btn.make { height: 54px; font-size: 18px; border: 0; color: #2a1a00; background: linear-gradient(180deg, #ffe08a, #f2b33a); box-shadow: 0 3px 0 #a8701a, 0 0 0 0 rgba(242, 195, 90, .6); animation: makePulse 1.8s ease-out infinite; margin-top: 12px; }
+@keyframes makePulse { 0% { box-shadow: 0 3px 0 #a8701a, 0 0 0 0 rgba(242, 195, 90, .55); } 70% { box-shadow: 0 3px 0 #a8701a, 0 0 0 12px rgba(242, 195, 90, 0); } 100% { box-shadow: 0 3px 0 #a8701a, 0 0 0 0 rgba(242, 195, 90, 0); } }

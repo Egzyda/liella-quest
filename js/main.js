@@ -1,10 +1,10 @@
 // 画面と操作：タイトル・魔王の玉座・モンスター作り・作戦会議と戦闘の再生
-import { IDS, CHARS, charGear, ELEMS, ELEM, WEAPONS, WEAPON, KEYS, keyName, STATS, STAT, SHAPES, TRAITS, STAGES, RES_MULT } from './data.js?v=2026.11.03-19';
-import * as E from './engine.js?v=2026.11.03-19';
-import { monsterSVG } from './monster.js?v=2026.11.03-19';
-import { AI, OLLAMA_MODEL } from './llm.js?v=2026.11.03-19';
-import { say } from './talk.js?v=2026.11.03-19';
-import { VERSION } from './version.js?v=2026.11.03-19';
+import { IDS, CHARS, charGear, ELEMS, ELEM, WEAPONS, WEAPON, KEYS, keyName, STATS, STAT, SHAPES, TRAITS, STAGES, RES_MULT } from './data.js?v=2026.11.03-20';
+import * as E from './engine.js?v=2026.11.03-20';
+import { monsterSVG } from './monster.js?v=2026.11.03-20';
+import { AI, OLLAMA_MODEL } from './llm.js?v=2026.11.03-20';
+import { say } from './talk.js?v=2026.11.03-20';
+import { VERSION } from './version.js?v=2026.11.03-20';
 
 const $ = id => document.getElementById(id);
 const h = (tag, attrs = {}, html = '') => { const e = document.createElement(tag); for (const [k, v] of Object.entries(attrs)) { if (k === 'on') for (const [ev, fn] of Object.entries(v)) e.addEventListener(ev, fn); else if (k === 'style') e.style.cssText = v; else e.setAttribute(k, v); } if (html) e.innerHTML = html; return e; };
@@ -131,9 +131,10 @@ function hub() {
     card.innerHTML = `<div class="label">${f.boss ? 'ボス戦' : `${G.fight + 1}戦目`}　使える魔力 ${f.budget}${tries ? `　（${tries}回撃退）` : ''}</div>
       <div class="next-row"><div class="mini">${d ? monsterSVG(d, { size: 104 }) : '<span class="note">まだ<br>いない</span>'}</div>
       <div class="info">${d ? `<b>${esc(d.name)}</b><br>${E.lookName(d)}<br>魔力 ${E.costOf(d)} / ${f.budget}${tries ? '<br><span class="note">撃退されたLiella!が、作戦を変えて戻ってきます。増えた魔力で強くしておきましょう。</span>' : ''}` : '<span class="note">向かってくるLiella!を迎え撃つモンスターを作りましょう。</span>'}</div></div>
-      <div class="btn-row"><button class="btn" id="btn-edit">${d ? '直す' : '作る'}</button><button class="btn primary" id="btn-go" ${d ? '' : 'disabled'}>迎え撃つ</button></div>`;
+      ${d ? '<div class="btn-row"><button class="btn" id="btn-edit">直す</button><button class="btn primary" id="btn-go">迎え撃つ</button></div>'
+        : '<button class="btn make" id="btn-edit">モンスターを作る</button>'}`;
     $('btn-edit').onclick = () => editor();
-    $('btn-go').onclick = () => fight();
+    if (d) $('btn-go').onclick = () => fight();
   }
   for (const b of document.querySelectorAll('.tabs button')) { b.classList.toggle('on', b.dataset.tab === tab); b.onclick = () => { tab = b.dataset.tab; hub(); }; }
   for (const t of ['party', 'book', 'log']) $('tab-' + t).hidden = t !== tab;
