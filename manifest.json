@@ -1,0 +1,13 @@
+{
+  "name": "リエラクエスト",
+  "short_name": "リエラクエスト",
+  "start_url": "./",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#140f22",
+  "theme_color": "#140f22",
+  "icons": [
+    { "src": "img/icon-192.png", "sizes": "192x192", "type": "image/png" },
+    { "src": "img/icon-512.png", "sizes": "512x512", "type": "image/png" }
+  ]
+}

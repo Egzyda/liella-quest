@@ -1,0 +1,103 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no">
+<meta name="theme-color" content="#140f22">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="リエラクエスト">
+<title>リエラクエスト</title>
+<link rel="manifest" href="manifest.json">
+<link rel="icon" href="img/icon-192.png">
+<link rel="apple-touch-icon" href="img/icon-180.png">
+<link href="https://fonts.googleapis.com/css2?family=DotGothic16&family=M+PLUS+Rounded+1c:wght@400;700;800&display=swap" rel="stylesheet" media="print" onload="this.media='all'">
+<link rel="stylesheet" href="style.css?v=2026.11.03-2">
+</head>
+<body>
+<div id="boot">読み込み中…</div>
+
+<!-- タイトル -->
+<section id="title" class="screen" hidden>
+  <div class="title-box">
+    <div class="kicker">魔王目線の攻略観察ゲーム</div>
+    <h1>リエラ<span>クエスト</span></h1>
+    <p class="lead">Liella!の11人が、魔王討伐の旅に出た。<br>あなたは魔王。道中のモンスターを作って、<br>彼女たちがどう攻略するかを見届けよう。</p>
+    <div class="brain">
+      <div class="label">作戦会議の頭脳</div>
+      <label><input type="radio" name="ai" value="none" checked><span><b>ふつう</b><small>AIなし。性格と数字で考える</small></span></label>
+      <label><input type="radio" name="ai" value="cloud"><span><b>クラウドAI</b><small>作戦会議をAIが考える（1日の無料枠あり）</small></span></label>
+      <label id="ai-pc"><input type="radio" name="ai" value="ollama"><span><b>PCのAI（Ollama）</b><small>回数制限なし。PC専用</small>
+        <span id="ollama-opts" hidden>使うAI <input id="ollama-model" spellcheck="false" autocomplete="off"></span></span></label>
+      <div id="ai-note" class="note"></div>
+    </div>
+    <button id="btn-continue" class="btn primary" hidden>つづきから</button>
+    <button id="btn-new" class="btn">はじめから</button>
+    <button id="btn-help" class="btn ghost">遊び方</button>
+    <div id="ver" class="ver"></div>
+  </div>
+</section>
+
+<!-- 魔王の玉座 -->
+<section id="hub" class="screen" hidden>
+  <header class="bar">
+    <button id="hub-title" class="icon-btn" aria-label="タイトルへ">≡</button>
+    <div class="bar-mid"><div class="bar-title">魔王の玉座</div><div id="hub-sub" class="bar-sub"></div></div>
+    <div id="hub-day" class="day"></div>
+  </header>
+  <div class="scroll">
+    <div id="progress" class="progress"></div>
+    <div id="next-card" class="card"></div>
+    <div class="tabs"><button data-tab="party" class="on">パーティー</button><button data-tab="book">図鑑</button><button data-tab="log">記録</button></div>
+    <div id="tab-party" class="tab"></div>
+    <div id="tab-book" class="tab" hidden></div>
+    <div id="tab-log" class="tab" hidden></div>
+  </div>
+</section>
+
+<!-- モンスター作り -->
+<section id="editor" class="screen" hidden>
+  <header class="bar">
+    <button id="ed-back" class="icon-btn" aria-label="もどる">‹</button>
+    <div class="bar-mid"><div class="bar-title">モンスターを作る</div><div id="ed-sub" class="bar-sub"></div></div>
+  </header>
+  <div class="scroll">
+    <div class="ed-top">
+      <div id="ed-preview" class="ed-preview"></div>
+      <div class="ed-cost"><div id="ed-cost-text"></div><div class="meter"><i id="ed-cost-bar"></i></div><div id="ed-cost-note" class="note"></div></div>
+    </div>
+    <div id="ed-saved" class="ed-row"></div>
+    <div class="ed-row"><div class="label">名前</div><input id="ed-name" maxlength="14"></div>
+    <div class="ed-row"><div class="label">形</div><div id="ed-shape" class="chips"></div></div>
+    <div class="ed-row"><div class="label">属性（色）</div><div id="ed-elem" class="chips"></div></div>
+    <details open class="ed-sec"><summary>能力</summary><div id="ed-stats"></div></details>
+    <details open class="ed-sec"><summary>効き目（弱点と耐性）</summary><p class="note">弱点を作ると魔力が少し戻ってきます（最大9）。</p><div id="ed-res"></div></details>
+    <details open class="ed-sec"><summary>特性</summary><div id="ed-traits"></div></details>
+    <div style="height:90px"></div>
+  </div>
+  <div class="foot"><button id="ed-random" class="btn ghost small">おまかせ</button><button id="ed-ok" class="btn primary">これで決定</button></div>
+</section>
+
+<!-- 作戦会議と戦闘 -->
+<section id="scene" class="screen" hidden>
+  <div class="stage-area">
+    <div id="sc-mon" class="sc-mon"></div>
+    <div class="sc-mon-info"><div id="sc-mon-name"></div><div class="hp"><i id="sc-mon-hp"></i></div><div id="sc-mon-num" class="num"></div></div>
+    <img id="sc-stand" class="sc-stand" alt="">
+  </div>
+  <div id="sc-log" class="sc-log"></div>
+  <div id="sc-party" class="sc-party"></div>
+  <div class="sc-ctrl">
+    <div id="sc-speed" class="seg"><button data-s="1.5">ゆっくり</button><button data-s="1">ふつう</button><button data-s="0.4">はやい</button></div>
+    <button id="sc-skip" class="btn small ghost">最後まで</button>
+    <button id="sc-done" class="btn small primary" hidden>玉座へ戻る</button>
+  </div>
+</section>
+
+<!-- 下から出る詳細 -->
+<div id="sheet" class="sheet" hidden><div class="sheet-body"><button id="sheet-close" class="icon-btn sheet-x">×</button><div id="sheet-content"></div></div></div>
+<div id="toast" class="toast"></div>
+
+<script type="module" src="js/main.js?v=2026.11.03-2"></script>
+</body>
+</html>
