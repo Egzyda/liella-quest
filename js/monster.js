@@ -1,6 +1,6 @@
 // モンスターの見た目（SVG）。形・属性の色・数値で姿が変わる
 // 攻撃が高い→トゲや角、防御が高い→よろい、魔法防御が高い→魔法の輪、素早さ→風の線、体力→大きさ
-import { ELEM } from './data.js?v=2026.11.03-8';
+import { ELEM } from './data.js?v=2026.11.03-10';
 
 const shade = (hex, f) => {
   const n = parseInt(hex.slice(1), 16);
@@ -46,13 +46,18 @@ const BODY = {
 // 目の位置（形ごと）
 const EYES = { slime: [[82, 112], [118, 112]], beast: [[52, 86], [70, 86]], bird: [[92, 60], [108, 60]], golem: [[90, 54], [110, 54]], ghost: [[84, 92], [116, 92]], dragon: [[66, 50], [82, 50]], knight: [[90, 76], [110, 76]] };
 
+// 足もと（体のいちばん下）の高さ。ここを地面にして影を置く（飛行でなければ浮かない）
+const FOOT = { slime: 156, beast: 170, bird: 172, golem: 172, ghost: 162, dragon: 172, knight: 168 };
 let uid = 0;
 export function monsterSVG(d, { size = 180, hurt = false } = {}) {
   const gid = 'mg' + (++uid);
   const base = ELEM[d.elem]?.color || '#aaa';
   const c = { fill: base, light: shade(base, 0.45), dark: shade(base, -0.35), line: shade(base, -0.65) };
   const s = d.stats;
-  const scale = 0.72 + s.hp * 0.03;
+  const scale = Math.min(1.1, 0.72 + s.hp * 0.03);
+  // 地面（影）は y=178。足もとを地面にそろえる。飛行だけ少し浮かせて影を離す
+  const foot = FOOT[d.shape] || 160, fly = d.traits.includes('fly');
+  const ground = 178, dy = ground - foot - (fly ? 22 : 0);
   const parts = [];
   // 魔法防御：うしろに魔法の輪
   if (s.mdef >= 4) parts.push(`<circle cx="100" cy="105" r="${70 + s.mdef * 2}" fill="none" stroke="${shade(base, 0.6)}" stroke-width="${1 + s.mdef * 0.35}" stroke-dasharray="6 6" opacity="${0.25 + s.mdef * 0.05}"/>`);
@@ -81,6 +86,6 @@ export function monsterSVG(d, { size = 180, hurt = false } = {}) {
   if (d.traits.includes('sweep')) parts.push(`<path d="M20 180 Q100 150 180 180" stroke="${c.dark}" stroke-width="4" fill="none" stroke-dasharray="3 7" opacity=".7"/>`);
   return `<svg viewBox="0 0 200 200" width="${size}" height="${size}" class="mon-svg">
     <defs><radialGradient id="${gid}" cx="40%" cy="35%" r="75%"><stop offset="0" stop-color="${c.light}"/><stop offset="1" stop-color="${c.fill}"/></radialGradient></defs>
-    <ellipse cx="100" cy="182" rx="${60 * scale}" ry="8" fill="#000" opacity=".25"/>
-    <g transform="translate(100 110) scale(${scale.toFixed(2)}) translate(-100 -110)">${parts.join('').replaceAll('#GID', '#' + gid)}</g></svg>`;
+    <ellipse cx="100" cy="${ground + 1}" rx="${(fly ? 44 : 60) * scale}" ry="7" fill="#000" opacity=".25"/>
+    <g transform="translate(100 ${foot + dy})  scale(${scale.toFixed(2)}) translate(-100 -${foot})">${parts.join('').replaceAll('#GID', '#' + gid)}</g></svg>`;
 }

@@ -3,8 +3,8 @@
 // ・戦いはターン制。誰が何をするかは、性格と「図鑑」（これまでに見たこと）から決める
 // ・図鑑には見たことだけが書かれる（会心の一撃を「弱点」と勘ちがいすることもある）
 // ・負けたら町に戻って反省し、もう一度挑む
-import { ELEMS, ELEM, FOLK_WEAK, WEAPONS, WEAPON, KEYS, keyName, STATS, STAT, RES_MULT, SHAPES, TRAITS, STAGES, IDS, CHARS } from './data.js?v=2026.11.03-8';
-import { say, nameOf } from './talk.js?v=2026.11.03-8';
+import { ELEMS, ELEM, FOLK_WEAK, WEAPONS, WEAPON, KEYS, keyName, STATS, STAT, RES_MULT, SHAPES, TRAITS, STAGES, MAOU_GROW, IDS, CHARS } from './data.js?v=2026.11.03-10';
+import { say, nameOf } from './talk.js?v=2026.11.03-10';
 
 export const rnd = { f: Math.random };
 const R = () => rnd.f();
@@ -16,7 +16,7 @@ const gauss = () => (R() + R() + R() - 1.5) / 1.5;
 export function newGame() {
   const party = {};
   for (const id of IDS) party[id] = { lv: 1, exp: 0, mast: {}, tired: 0, hurt: 0 };
-  return { v: 1, stage: 0, fight: 0, party, book: {}, designs: [], next: null, tries: {}, history: [], cleared: false, day: 1, stageStart: 1, maouWin: false };
+  return { v: 1, stage: 0, fight: 0, party, book: {}, designs: [], next: null, tries: {}, history: [], cleared: false, day: 1, limit: STAGES[0].fights[0].days, power: 0, maouWin: false };
 }
 
 // ---------------- モンスター ----------------
@@ -67,7 +67,22 @@ export function autoName(d) {
   parts.push(NAME_SHAPE[d.shape]);
   return parts.join('');
 }
-export function currentFight(G) { return STAGES[G.stage]?.fights[G.fight]; }
+// いまの戦い。budget は魔王の成長ぶん（power）を足したもの、base はもとの魔力
+export function currentFight(G) {
+  const f = STAGES[G.stage]?.fights[G.fight];
+  return f && { ...f, base: f.budget, budget: f.budget + (G.power || 0) };
+}
+// 古いセーブを今のしくみに合わせる
+export function migrate(G) {
+  if (!G) return G;
+  if (G.limit == null) {
+    const F = STAGES[G.stage].fights;
+    G.limit = F.slice(0, Math.min(G.fight + 1, F.length)).reduce((a, f) => a + f.days, 0);
+    if (G.day - 1 >= G.limit) G.limit = G.day; // 移した直後に負けにならないよう1日残す
+  }
+  if (G.power == null) G.power = 0;
+  return G;
+}
 
 // ---------------- キャラの強さ ----------------
 export function charStats(G, id) {
@@ -106,10 +121,18 @@ export function bookEntry(G, d) { return G.book[lookKey(d)] || null; }
 // 見た目から思いこむ効き目（言い伝え）
 // 形ごとの思いこみ（スライムは斬れる・鳥は弓・ゴーレムは拳で砕く…）
 const FOLK_SHAPE = {
-  slime: { sword: 1.3, fist: 0.8 }, beast: { spear: 1.35, bow: 1.15 }, bird: { bow: 1.45, fist: 0.8 },
+  slime: { fist: 0.7, sword: 0.85, spear: 0.85, fire: 1.3 }, beast: { spear: 1.35, bow: 1.15 }, bird: { bow: 1.45, fist: 0.8 },
   golem: { fist: 1.35, sword: 0.75, bow: 0.75 }, ghost: { sword: 0.7, spear: 0.7, bow: 0.7, fist: 0.7, light: 1.3 },
   dragon: { spear: 1.3, sword: 1.1 }, knight: { fist: 1.3, sword: 0.8 },
 };
+// 思いこみの理由（形からか、色＝属性からか）
+const FOLK_SHAPE_TEXT = { slime: 'ぷよぷよしたスライム', beast: '獣', bird: '空の鳥', golem: '硬いゴーレム', ghost: '亡霊', dragon: '大きなドラゴン', knight: 'よろいの騎士' };
+export function folkText(d, k) {
+  if (ELEM[k] && FOLK_WEAK[d.elem] === k) return `${ELEM[d.elem].name}の魔物なら、${keyName(k)}が効くはず……！`;
+  return `${FOLK_SHAPE_TEXT[d.shape] || SHAPES[d.shape].name}なら、${keyName(k)}が効きそう……！`;
+}
+// 言い伝えのもと：属性からなら「水」、形からなら「スライム型」
+const folkWhy = (d, k) => (ELEM[k] && FOLK_WEAK[d.elem] === k ? ELEM[d.elem].name : SHAPES[d.shape].name + '型');
 function folkMult(d, k) {
   let m = FOLK_SHAPE[d.shape]?.[k] || 1;
   if (ELEM[k] && FOLK_WEAK[d.elem] === k) m *= 1.35;
@@ -164,11 +187,11 @@ export function meeting(G, d, ai = null) {
     if (bl && !(['known', 'fact'].includes(bl.src) && bl.m <= 0.6)) focus = ai.focus;
     if (plan === 'explore' || !focus) ev.push(say(strat, 'meet_unknown', {}));
     else if (['known', 'fact'].includes(bl.src)) ev.push(say(strat, 'meet_known', { k: keyName(focus) }));
-    else ev.push(say(strat, 'meet_folk', { e: ELEM[d.elem].name, k: keyName(focus) }));
+    else ev.push(say(strat, 'meet_folk', { e: folkWhy(d, focus), k: keyName(focus) }));
     if (ai.reason) ev.push({ t: 'think', sp: strat, text: ai.reason });
   } else if (A.good.length) { focus = A.good[0].k; plan = 'focus'; ev.push(say(strat, 'meet_known', { k: keyName(focus) })); }
   else if (A.met && A.bad.length) { plan = 'explore'; ev.push(say(strat, 'meet_bad', { k: keyName(A.bad[0].k) })); }
-  else if (A.folk.length) { focus = A.folk[0].k; plan = 'folk'; ev.push(say(strat, 'meet_folk', { e: ELEM[d.elem].name, k: keyName(focus) })); }
+  else if (A.folk.length) { focus = A.folk[0].k; plan = 'folk'; ev.push(say(strat, 'meet_folk', { e: folkWhy(d, focus), k: keyName(focus) })); }
   else { plan = 'explore'; ev.push(say(strat, 'meet_unknown', {})); }
   if (A.losses > 0 && !useAI) ev.push({ t: 'think', sp: strat, text: `前は負けた。${A.bad.length ? keyName(A.bad[0].k) + 'は効かなかったから、使わない。' : '同じやり方では勝てない。'}` });
   // 出撃の4人
@@ -231,6 +254,8 @@ export async function battle(G, d, M, hooks = {}) {
   const ev = [];
   const B = bookOf(G, d);
   B.met++;
+  // 戦う前から図鑑に書いてあった攻撃（この戦いで初めて見たものは「さっき見た」と言う）
+  const inBook = new Set([...Object.keys(B.obs), ...Object.keys(B.res)]);
   const ms = monStats(d);
   const mon = { hp: ms.maxHp, max: ms.maxHp, raged: false, poisonOn: {} };
   const team = M.team.slice();
@@ -300,8 +325,11 @@ export async function battle(G, d, M, hooks = {}) {
     const k = o.k, s = st[id];
     used[id][k] = (used[id][k] || 0) + 1;
     const nm = nameOf(id);
-    if (o.reason === 'known') think(id, 'known', `図鑑によると、${keyName(k)}がよく効くはず。`);
-    else if (o.reason === 'folk') think(id, 'folk', `${ELEM[d.elem].name}の魔物なら、${keyName(k)}が効くはず……！`);
+    if (o.reason === 'known') {
+      if (B.res[k] != null) think(id, 'known', `分析では、${keyName(k)}がよく効くはず。`);
+      else if (inBook.has(k)) think(id, 'known', `図鑑によると、${keyName(k)}がよく効くはず。`);
+      else think(id, 'known', `さっきの${keyName(k)}がよく効いていた。続けて狙おう。`);
+    } else if (o.reason === 'folk') think(id, 'folk', folkText(d, k));
     else if (o.reason === 'explore') { think(id, 'explore', `まだ試していない${keyName(k)}を試してみよう。`); if (R() < 0.4) push(say(id, 'try', { k: keyName(k) })); }
     else if (o.reason === 'plan') think(id, 'plan', `作戦どおり、${keyName(k)}で攻める。`);
     else if (o.reason === 'avoid') think(id, 'avoid', `${keyName(k)}は効きが悪いけど……ほかに手がない。`);
@@ -575,15 +603,15 @@ export async function battle(G, d, M, hooks = {}) {
   const win = outcome === 'win';
   if (win) {
     const last = alive().sort(() => R() - 0.5)[0];
-    push({ t: 'win', text: `${d.name}をたおした！` });
+    push({ t: 'win', text: `${d.name}が倒された……。道を突破された！` });
     push(say(last, 'win', {}));
     B.wins++;
   } else {
     B.losses++;
-    push({ t: 'lose', text: outcome === 'wipe' ? '全員倒れてしまった……。町まで逃げ帰った。' : outcome === 'timeup' ? '長い戦いに疲れ果て、一度引き上げた。' : 'パーティーは町まで撤退した。' });
+    push({ t: 'lose', text: '撃退！ ' + (outcome === 'wipe' ? 'Liella!は全員倒れ、町まで逃げ帰った。' : outcome === 'timeup' ? 'Liella!は長い戦いに疲れ果て、引き上げていった。' : 'Liella!は町まで撤退していった。') });
   }
   // 成長：出た人は経験値と熟練度。控えは経験値半分
-  const budget = fightInfo?.budget || 40;
+  const budget = fightInfo?.base || 40;
   const expAll = Math.round(budget * (win ? 3 : 1.2));
   const ups = [];
   const fought = new Set([...team, ...Object.keys(used)]);
@@ -605,6 +633,9 @@ export async function battle(G, d, M, hooks = {}) {
   G.tries[key] = (G.tries[key] || 0) + 1;
   G.history.push({ day: G.day, name: d.name, look: lookName(d), team: M.team, win, outcome, rounds: round });
   G.day++;
+  // 魔王の成長：戦うたびに魔力が増える（撃退したら多め）
+  const grow = win ? MAOU_GROW.lose : MAOU_GROW.win;
+  G.power = (G.power || 0) + grow;
   return { ev, win, outcome, round, used, team };
 }
 
@@ -621,7 +652,7 @@ export function review(G, d, res) {
     else if (A.bad.length) ev.push(say(sp, 'review_lose_bad', { k: keyName(A.bad[0].k) }));
     else ev.push(say(sp, 'review_lose', {}));
     const left = daysLeft(G);
-    if (left > 0 && left <= 3) ev.push({ t: 'narr', text: `魔王が力を取り戻すまで、あと${left}日。` });
+    if (left > 0 && left <= 3) ev.push({ t: 'narr', text: `魔王が完全な力を取り戻すまで、あと${left}日。` });
     const hurt = IDS.filter(id => G.party[id].hurt);
     if (hurt.length) ev.push({ t: 'narr', text: `${hurt.map(nameOf).join('・')}はケガで次の戦いを休む。` });
   }
@@ -629,7 +660,7 @@ export function review(G, d, res) {
 }
 
 // 期限：あと何日戦えるか（0になったら、それ以上は挑めない）
-export function daysLeft(G) { return (STAGES[G.stage]?.days || 99) - (G.day - (G.stageStart || 1)); }
+export function daysLeft(G) { return (G.limit ?? 9) - (G.day - 1); }
 // 戦いのあとで呼ぶ：期限切れなら魔王の勝ち
 export function checkDeadline(G) {
   if (!G.cleared && !G.maouWin && daysLeft(G) <= 0) G.maouWin = true;
@@ -641,6 +672,7 @@ export function advance(G) {
   G.fight++;
   G.next = null;
   if (G.fight >= S.fights.length) { G.cleared = true; }
+  else G.limit = (G.limit ?? 9) + S.fights[G.fight].days; // 次の戦いのぶんの日数が増える（残りは持ちこし）
 }
 
 // 図鑑の表示用

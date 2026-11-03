@@ -1,9 +1,9 @@
 // 画面と操作：タイトル・魔王の玉座・モンスター作り・作戦会議と戦闘の再生
-import { IDS, CHARS, ELEMS, ELEM, WEAPONS, WEAPON, KEYS, keyName, STATS, STAT, SHAPES, TRAITS, STAGES, RES_MULT } from './data.js?v=2026.11.03-8';
-import * as E from './engine.js?v=2026.11.03-8';
-import { monsterSVG } from './monster.js?v=2026.11.03-8';
-import { AI, OLLAMA_MODEL } from './llm.js?v=2026.11.03-8';
-import { VERSION } from './version.js?v=2026.11.03-8';
+import { IDS, CHARS, ELEMS, ELEM, WEAPONS, WEAPON, KEYS, keyName, STATS, STAT, SHAPES, TRAITS, STAGES, RES_MULT } from './data.js?v=2026.11.03-10';
+import * as E from './engine.js?v=2026.11.03-10';
+import { monsterSVG } from './monster.js?v=2026.11.03-10';
+import { AI, OLLAMA_MODEL } from './llm.js?v=2026.11.03-10';
+import { VERSION } from './version.js?v=2026.11.03-10';
 
 const $ = id => document.getElementById(id);
 const h = (tag, attrs = {}, html = '') => { const e = document.createElement(tag); for (const [k, v] of Object.entries(attrs)) { if (k === 'on') for (const [ev, fn] of Object.entries(v)) e.addEventListener(ev, fn); else if (k === 'style') e.style.cssText = v; else e.setAttribute(k, v); } if (html) e.innerHTML = html; return e; };
@@ -16,7 +16,7 @@ const KEY = 'lq-v1';
 let G = null;
 let set = { ai: 'none', model: OLLAMA_MODEL, speed: 1 };
 function load() {
-  try { const j = JSON.parse(localStorage.getItem(KEY) || 'null'); if (j) { G = j.G || null; Object.assign(set, j.set || {}); } } catch {}
+  try { const j = JSON.parse(localStorage.getItem(KEY) || 'null'); if (j) { G = E.migrate(j.G || null); Object.assign(set, j.set || {}); } } catch {}
 }
 function save() { try { localStorage.setItem(KEY, JSON.stringify({ G, set })); } catch {} }
 
@@ -62,7 +62,7 @@ $('btn-new').onclick = async () => {
   if (G && !confirm('はじめからにしますか？（いまの旅の記録は消えます）')) return;
   if (!(await prepareAI())) return;
   G = E.newGame(); save();
-  openSheet(`<div class="help"><h3>旅立ち</h3><p>Liella!の11人が、魔王討伐の旅に出ました。</p><p>あなたは<b>魔王</b>。道中に出るモンスターを、魔力の範囲で自由に作れます。</p><p>彼女たちは作戦会議で出撃する4人を決め、戦いながら弱点を探し、負けても図鑑に書いて学んでいきます。</p><p>まずは「草原」の最初の敵を作ってみましょう。</p></div>`);
+  openSheet(`<div class="help"><h3>魔王、目覚める</h3><p>あなたは<b>魔王</b>。Liella!の11人が、あなたを倒すために旅立ちました。</p><p>道にモンスターを置いて迎え撃ち、<b>期限まで草原を抜けさせなければ魔王の勝ち</b>です。</p><p>彼女たちは作戦会議で4人を選び、戦いながら弱点を探し、負けても図鑑に書いて学んできます。魔王も戦うたびに力（魔力）が増えます。</p><p>まずは最初の1体を作りましょう。</p></div>`);
   hub();
 };
 $('btn-help').onclick = () => openSheet(HELP);
@@ -75,9 +75,11 @@ async function hardReload() {
 }
 $('btn-update').onclick = hardReload;
 const HELP = `<div class="help"><h3>遊び方</h3>
-<p><b>勝ち負け</b>：1回戦うと1日たちます。Liella!が<b>9日以内</b>に草原（4戦・最後はボス）を抜けられなければ<b>魔王の勝ち</b>。抜けられたら魔王の負けです。負けたパーティーは、作戦を変えて何度でも挑んできます。</p>
-<p><b>魔王の玉座</b>：次の戦いのモンスターを作って「挑ませる」。負けたあとは、同じモンスターのまま挑ませても、直してもかまいません。</p>
-<p><b>モンスター作り</b>：能力（体力・攻撃・防御…）、効き目（弱点と耐性）、特性（再生・飛行…）を決める。能力は1ポイント＝魔力1で、どの能力も1ポイントでだいたい同じくらい強くなります。ただし防御は、片方だけ上げるとパーティーがもう片方（物理⇔魔法）で攻めてくるので、両方上げると効きます。弱点を作ると魔力が少し戻ります（最大9）。名前は「おまかせ」で形・属性・能力から自動で付きます。</p>
+<p><b>勝ち負け</b>：あなたは魔王。草原（4戦・最後はボス）に向かってくるLiella!を迎え撃ちます。1回戦うと1日たち、<b>期限が0日になったら魔王の勝ち</b>。ボスまで倒されたら魔王の負けです。</p>
+<p><b>期限</b>：最初は2日。Liella!が1つ突破するたびに、次の戦いのぶんの日数が足されます（2戦目+3日・3戦目+3日・ボス+4日。残った日は持ちこし）。後の敵ほど強いので、Liella!が挑める回数も多くなります。</p>
+<p><b>魔王の成長</b>：戦うたびに使える魔力が増えます（撃退すると+3、突破されても+2）。レベルが上がっていくLiella!に負けないよう、増えた魔力でモンスターを強くしましょう。</p>
+<p><b>魔王の玉座</b>：次の戦いのモンスターを作って「迎え撃つ」。撃退したあとは、同じモンスターのままでも、直してもかまいません。</p>
+<p><b>モンスター作り</b>：能力（体力・攻撃・防御…）、効き目（弱点と耐性）、特性（再生・飛行…）を決める。能力は1ポイント＝魔力1で、どの能力も1ポイントでだいたい同じくらい強くなります（0〜15）。ただし防御は、片方だけ上げるとパーティーがもう片方（物理⇔魔法）で攻めてくるので、両方上げると効きます。弱点を作ると魔力が少し戻ります（最大9）。名前は「おまかせ」で形・属性・能力から自動で付きます。</p>
 <p><b>見た目と言い伝え</b>：パーティーは見た目（形と色）で判断します。火の色なら「水が効くはず」と思いこむので、そこを無効にしておくと引っかかります。同じ見た目で中身を変えると、前の記憶が通じず混乱します。</p>
 <p><b>パーティー</b>：11人それぞれ武器や属性の得意度（0〜10）、性格がちがいます。使った武器や魔法は少しずつ上達します。戦った人は疲れ、倒れた人は次の戦いを休みます。控えも経験値を半分もらえます。</p>
 <p><b>図鑑</b>：パーティーが見て覚えたこと。会心の一撃を弱点と勘ちがいすることもあります（理屈っぽい人は割り引いて考える）。</p>
@@ -88,23 +90,23 @@ let tab = 'party';
 function hub() {
   show('hub');
   const S = STAGES[G.stage], f = E.currentFight(G);
-  $('hub-sub').textContent = `ステージ：${S.name}`;
   $('hub-day').innerHTML = G.cleared || G.maouWin ? `${G.day - 1}日` : `期限まで<br><b style="color:var(--gold);font-size:15px">あと${E.daysLeft(G)}日</b>`;
+  $('hub-sub').textContent = `ステージ：${S.name}　魔王の力 +${G.power || 0}`;
   $('progress').innerHTML = S.fights.map((x, i) => `<div class="dot ${i < G.fight || G.cleared ? 'done' : i === G.fight ? 'now' : ''}">${x.boss ? 'ボス' : i + 1 + '戦目'}</div>`).join('');
   const card = $('next-card');
   if (G.maouWin) {
-    card.innerHTML = `<h3 class="win">魔王の勝ち！</h3><p class="note">Liella!は${S.days}日以内に草原を抜けられませんでした。<br>（${S.fights.length}戦のうち${G.fight}戦を突破・挑戦${Object.values(G.tries).reduce((a, b) => a + b, 0)}回）</p><button class="btn" id="btn-restart">はじめから遊ぶ</button>`;
+    card.innerHTML = `<h3 class="win">魔王の勝ち！</h3><p class="note">Liella!は期限までに草原を抜けられず、旅をあきらめました。<br>（${S.fights.length}戦のうち${G.fight}戦を突破されただけ・撃退${G.history.filter(x => !x.win).length}回）</p><button class="btn" id="btn-restart">はじめから遊ぶ</button>`;
     $('btn-restart').onclick = () => { if (confirm('はじめからにしますか？')) { G = E.newGame(); save(); hub(); } };
   } else if (G.cleared) {
-    card.innerHTML = `<h3 class="lose">魔王の負け……草原をクリアされた！</h3><p class="note">パーティーは${G.day - 1}日目に草原のボスを倒しました（期限は${S.days}日）。（次のステージは、これから作ります）<br>挑戦の回数：${Object.values(G.tries).reduce((a, b) => a + b, 0)}回</p><button class="btn" id="btn-restart">はじめから遊ぶ</button>`;
+    card.innerHTML = `<h3 class="lose">魔王の負け……草原を突破された</h3><p class="note">Liella!は${G.day - 1}日目に草原のボスを倒しました。（次のステージは、これから作ります）<br>撃退した回数：${G.history.filter(x => !x.win).length}回</p><button class="btn" id="btn-restart">はじめから遊ぶ</button>`;
     $('btn-restart').onclick = () => { if (confirm('はじめからにしますか？')) { G = E.newGame(); save(); hub(); } };
   } else {
     const tries = G.tries[`${G.stage}-${G.fight}`] || 0;
     const d = G.next;
-    card.innerHTML = `<div class="label">${f.boss ? 'ボス戦' : `${G.fight + 1}戦目`}　使える魔力 ${f.budget}${tries ? `　（${tries}回しのいだ）` : ''}</div>
+    card.innerHTML = `<div class="label">${f.boss ? 'ボス戦' : `${G.fight + 1}戦目`}　使える魔力 ${f.budget}${tries ? `　（${tries}回撃退）` : ''}</div>
       <div class="next-row"><div class="mini">${d ? monsterSVG(d, { size: 104 }) : '<span class="note">まだ<br>いない</span>'}</div>
-      <div class="info">${d ? `<b>${esc(d.name)}</b><br>${E.lookName(d)}<br>魔力 ${E.costOf(d)} / ${f.budget}${tries ? '<br><span class="note">負けたパーティーが、作戦を変えて戻ってきます。直すこともできます。</span>' : ''}` : '<span class="note">次に道をふさぐモンスターを作りましょう。</span>'}</div></div>
-      <div class="btn-row"><button class="btn" id="btn-edit">${d ? '直す' : '作る'}</button><button class="btn primary" id="btn-go" ${d ? '' : 'disabled'}>挑ませる</button></div>`;
+      <div class="info">${d ? `<b>${esc(d.name)}</b><br>${E.lookName(d)}<br>魔力 ${E.costOf(d)} / ${f.budget}${tries ? '<br><span class="note">撃退されたLiella!が、作戦を変えて戻ってきます。増えた魔力で強くしておきましょう。</span>' : ''}` : '<span class="note">向かってくるLiella!を迎え撃つモンスターを作りましょう。</span>'}</div></div>
+      <div class="btn-row"><button class="btn" id="btn-edit">${d ? '直す' : '作る'}</button><button class="btn primary" id="btn-go" ${d ? '' : 'disabled'}>迎え撃つ</button></div>`;
     $('btn-edit').onclick = () => editor();
     $('btn-go').onclick = () => fight();
   }
@@ -153,7 +155,7 @@ function renderBook() {
 function renderLog() {
   const el = $('tab-log');
   if (!G.history.length) { el.innerHTML = '<p class="note">まだ戦いの記録はありません。</p>'; return; }
-  el.innerHTML = G.history.slice().reverse().map(x => `<div class="log-item">${x.day}日目　<b>${esc(x.name)}</b>（${x.look}）<br><span class="${x.win ? 'win' : 'lose'}">${x.win ? '勝利' : x.outcome === 'wipe' ? '全滅' : '撤退'}</span>　${x.rounds}ターン　${x.team.map(id => CHARS[id].name).join('・')}</div>`).join('');
+  el.innerHTML = G.history.slice().reverse().map(x => `<div class="log-item">${x.day}日目　<b>${esc(x.name)}</b>（${x.look}）<br><span class="${x.win ? 'lose' : 'win'}">${x.win ? '突破された' : x.outcome === 'wipe' ? '撃退（全滅させた）' : '撃退（撤退させた）'}</span>　${x.rounds}ターン　${x.team.map(id => CHARS[id].name).join('・')}</div>`).join('');
 }
 
 // ---------------- モンスター作り ----------------
@@ -195,7 +197,7 @@ function edRender(full) {
     for (const b of $('ed-shape').children) b.onclick = () => { D.shape = b.dataset.k; edRender(true); };
     $('ed-elem').innerHTML = ELEMS.map(k => `<button data-k="${k}" class="${D.elem === k ? 'on' : ''}"><span class="sw" style="background:${ELEM[k].color}"></span>${ELEM[k].name}</button>`).join('');
     for (const b of $('ed-elem').children) b.onclick = () => { D.elem = b.dataset.k; edRender(true); };
-    $('ed-stats').innerHTML = STATS.map(s => sliderRow(STAT[s].name, 0, 10, D.stats[s], `sv-${s}`)).join('');
+    $('ed-stats').innerHTML = STATS.map(s => sliderRow(STAT[s].name, 0, 15, D.stats[s], `sv-${s}`)).join('');
     $('ed-stats').querySelectorAll('.sl').forEach((row, i) => wireSlider(row, v => { D.stats[STATS[i]] = v; edRender(false); }));
     $('ed-res').innerHTML = KEYS.map(k => sliderRow(keyName(k), -3, 3, D.res[k] || 0, `rv-${k}`)).join('');
     $('ed-res').querySelectorAll('.sl').forEach((row, i) => wireSlider(row, v => { if (v) D.res[KEYS[i]] = v; else delete D.res[KEYS[i]]; edRender(false); }));
@@ -237,7 +239,7 @@ function randomDesign(budget, name) {
   for (let t = 0; t < 300; t++) {
     const d = E.blankDesign();
     d.name = name || ''; d.shape = pick(Object.keys(SHAPES)); d.elem = pick(ELEMS);
-    for (const s of STATS) d.stats[s] = Math.floor(R() * 8);
+    for (const s of STATS) d.stats[s] = Math.floor(R() * Math.min(16, budget / 4));
     for (let i = 0; i < 3; i++) if (R() < 0.6) d.res[pick(KEYS)] = Math.floor(R() * 7) - 3;
     if (R() < 0.5) d.traits.push(pick(Object.keys(TRAITS)));
     const c = E.costOf(d);
@@ -286,8 +288,9 @@ async function fight() {
   save();
   if (!play) return;
   play.evs.push({ t: 'narr', text: '― 反省会 ―', cls: 'round' }, ...rv);
-  if (G.maouWin) play.evs.push({ t: 'lose', text: '期限切れ！ Liella!は草原を抜けられなかった。魔王の勝ち！' });
-  else if (G.cleared) play.evs.push({ t: 'win', text: `草原を突破された！（${G.day - 1}日目）` });
+  if (G.maouWin) play.evs.push({ t: 'end', cls: 'win', text: '期限切れ！ Liella!は草原を抜けられなかった。魔王の勝ち！' });
+  else if (G.cleared) play.evs.push({ t: 'end', cls: 'lose', text: `草原のボスまで倒された……魔王の負け（${G.day - 1}日目）` });
+  else play.evs.push({ t: 'narr', text: res.win ? `魔王の力が増した。次の戦いで使える魔力 ${E.currentFight(G).budget}（期限まであと${E.daysLeft(G)}日）` : `魔王の力が増した。使える魔力 ${E.currentFight(G).budget}（期限まであと${E.daysLeft(G)}日）` });
   play.computing = false;
   if (play.idle) { play.idle = false; step(); }
 }
@@ -332,8 +335,9 @@ function addEv(e) {
     el = h('div', { class: 'ev think' }, `<img src="${face(e.sp)}" alt=""><span>${esc(e.text)}</span>`);
   } else if (e.t === 'think') {
     el = h('div', { class: 'ev think' }, `<img src="${face(e.sp)}" alt=""><span>（${esc(e.text)}）</span>`);
-  } else if (e.t === 'win' || e.t === 'lose') {
-    el = h('div', { class: `ev banner ${e.t}` }, esc(e.text));
+  } else if (e.t === 'win' || e.t === 'lose' || e.t === 'end') {
+    // 色は魔王から見た勝ち負け（Liella!の勝ち＝赤、撃退＝緑）
+    el = h('div', { class: `ev banner ${e.cls || (e.t === 'win' ? 'lose' : 'win')}` }, esc(e.text));
   } else {
     const cls = e.cls || ({ round: 'round', mon: 'mon', hurt: 'mon', down: 'mon', team: 'team', lvup: 'lvup', hit: 'hit' }[e.t] || 'narr');
     const txt = e.t === 'hit' ? esc(e.text).replace(/(\d+)のダメージ/, '<span class="d">$1</span>のダメージ') : esc(e.text);

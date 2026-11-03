@@ -47,10 +47,13 @@ export const TRAITS = {
   sweep: { name: '全体攻撃', cost: 6, desc: 'ときどき4人まとめて攻撃する' },
 };
 
-// ステージ：戦い4つ（最後はボス）。魔力＝モンスターに使えるポイント。days＝期限（1回戦うと1日。期限までに抜けられなければ魔王の勝ち）
+// ステージ：戦い4つ（最後はボス）。魔力＝モンスターに使えるポイント。
+// days＝その戦いにたどり着いたときに増える日数（1回戦うと1日。残った日は持ちこし。0になったら魔王の勝ち）。後の戦いほど強いので日数も多い
 export const STAGES = [
-  { name: '草原', bg: 'plain', days: 9, fights: [{ budget: 34 }, { budget: 42 }, { budget: 50 }, { budget: 64, boss: true }] },
+  { name: '草原', bg: 'plain', fights: [{ budget: 34, days: 3 }, { budget: 42, days: 3 }, { budget: 50, days: 4 }, { budget: 64, boss: true, days: 5 }] },
 ];
+// 魔王の成長：戦うたびに使える魔力が増える（撃退したときは多め）
+export const MAOU_GROW = { win: 2, lose: 1 };
 
 // Liella! 11人（呼び方は資料「口調一覧」と同じ）
 // base：体力・力・魔力・守り・魔法の守り・素早さ（レベル1のとき）
