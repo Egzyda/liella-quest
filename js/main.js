@@ -1,9 +1,9 @@
 // 画面と操作：タイトル・魔王の玉座・モンスター作り・作戦会議と戦闘の再生
-import { IDS, CHARS, ELEMS, ELEM, WEAPONS, WEAPON, KEYS, keyName, STATS, STAT, SHAPES, TRAITS, STAGES, RES_MULT } from './data.js?v=2026.11.03-4';
-import * as E from './engine.js?v=2026.11.03-4';
-import { monsterSVG } from './monster.js?v=2026.11.03-4';
-import { AI, OLLAMA_MODEL } from './llm.js?v=2026.11.03-4';
-import { VERSION } from './version.js?v=2026.11.03-4';
+import { IDS, CHARS, ELEMS, ELEM, WEAPONS, WEAPON, KEYS, keyName, STATS, STAT, SHAPES, TRAITS, STAGES, RES_MULT } from './data.js?v=2026.11.03-6';
+import * as E from './engine.js?v=2026.11.03-6';
+import { monsterSVG } from './monster.js?v=2026.11.03-6';
+import { AI, OLLAMA_MODEL } from './llm.js?v=2026.11.03-6';
+import { VERSION } from './version.js?v=2026.11.03-6';
 
 const $ = id => document.getElementById(id);
 const h = (tag, attrs = {}, html = '') => { const e = document.createElement(tag); for (const [k, v] of Object.entries(attrs)) { if (k === 'on') for (const [ev, fn] of Object.entries(v)) e.addEventListener(ev, fn); else if (k === 'style') e.style.cssText = v; else e.setAttribute(k, v); } if (html) e.innerHTML = html; return e; };
@@ -66,13 +66,22 @@ $('btn-new').onclick = async () => {
   hub();
 };
 $('btn-help').onclick = () => openSheet(HELP);
+// 最新版に更新：古いファイルが残っていても、全部読み直す
+async function hardReload() {
+  toast('最新版を読み込んでいます…');
+  const files = ['index.html', 'style.css', 'manifest.json', ...['main', 'engine', 'data', 'talk', 'monster', 'llm', 'version'].map(f => `js/${f}.js`), ...['index', ...IDS].map(f => `js/lines/${f}.js`)];
+  try { await Promise.all(files.map(f => fetch(f, { cache: 'reload' }))); } catch { /* オフラインなら無視 */ }
+  location.replace(location.pathname + '?r=' + Date.now());
+}
+$('btn-update').onclick = hardReload;
 const HELP = `<div class="help"><h3>遊び方</h3>
-<p><b>魔王の玉座</b>：次の戦いのモンスターを作って「挑ませる」。草原は4戦（最後はボス）。</p>
-<p><b>モンスター作り</b>：能力（体力・攻撃・防御…）、効き目（弱点と耐性）、特性（再生・飛行…）を決める。強い数字ほど魔力を多く使う。弱点を作ると魔力が少し戻る。</p>
+<p><b>勝ち負け</b>：1回戦うと1日たちます。Liella!が<b>9日以内</b>に草原（4戦・最後はボス）を抜けられなければ<b>魔王の勝ち</b>。抜けられたら魔王の負けです。負けたパーティーは、作戦を変えて何度でも挑んできます。</p>
+<p><b>魔王の玉座</b>：次の戦いのモンスターを作って「挑ませる」。負けたあとは、同じモンスターのまま挑ませても、直してもかまいません。</p>
+<p><b>モンスター作り</b>：能力（体力・攻撃・防御…）、効き目（弱点と耐性）、特性（再生・飛行…）を決める。能力は1ポイント＝魔力1で、どの能力も1ポイントでだいたい同じくらい強くなります。ただし防御は、片方だけ上げるとパーティーがもう片方（物理⇔魔法）で攻めてくるので、両方上げると効きます。弱点を作ると魔力が少し戻ります（最大9）。名前は「おまかせ」で形・属性・能力から自動で付きます。</p>
 <p><b>見た目と言い伝え</b>：パーティーは見た目（形と色）で判断します。火の色なら「水が効くはず」と思いこむので、そこを無効にしておくと引っかかります。同じ見た目で中身を変えると、前の記憶が通じず混乱します。</p>
 <p><b>パーティー</b>：11人それぞれ武器や属性の得意度（0〜10）、性格がちがいます。使った武器や魔法は少しずつ上達します。戦った人は疲れ、倒れた人は次の戦いを休みます。控えも経験値を半分もらえます。</p>
 <p><b>図鑑</b>：パーティーが見て覚えたこと。会心の一撃を弱点と勘ちがいすることもあります（理屈っぽい人は割り引いて考える）。</p>
-<p><b>作戦会議の頭脳</b>：「ふつう」は性格と数字で、クラウドAI・PCのAIは、AIが表を見て出撃メンバーと作戦を考えます。セリフはどのモードでもキャラごとに用意したものです。</p></div>`;
+<p><b>頭脳</b>：「ふつう」は性格と数字で考えます。クラウドAI・PCのAIは、作戦会議（出撃メンバーと作戦）と、戦闘中の大事な場面（ピンチ・予想外のこと）でAIが判断します。PCのAIは回数制限がないので、3ターンごとの見直しもAIがします（1回の戦闘で最大6回）。セリフはどのモードでも、キャラごとに用意したものです。</p></div>`;
 
 // ---------------- 魔王の玉座 ----------------
 let tab = 'party';
@@ -80,11 +89,14 @@ function hub() {
   show('hub');
   const S = STAGES[G.stage], f = E.currentFight(G);
   $('hub-sub').textContent = `ステージ：${S.name}`;
-  $('hub-day').textContent = `${G.day}日目`;
+  $('hub-day').innerHTML = G.cleared || G.maouWin ? `${G.day - 1}日` : `期限まで<br><b style="color:var(--gold);font-size:15px">あと${E.daysLeft(G)}日</b>`;
   $('progress').innerHTML = S.fights.map((x, i) => `<div class="dot ${i < G.fight || G.cleared ? 'done' : i === G.fight ? 'now' : ''}">${x.boss ? 'ボス' : i + 1 + '戦目'}</div>`).join('');
   const card = $('next-card');
-  if (G.cleared) {
-    card.innerHTML = `<h3>草原をクリアされた！</h3><p class="note">パーティーは草原のボスを倒しました。（次のステージは、これから作ります）<br>挑戦の回数：${Object.values(G.tries).reduce((a, b) => a + b, 0)}回</p><button class="btn" id="btn-restart">はじめから遊ぶ</button>`;
+  if (G.maouWin) {
+    card.innerHTML = `<h3 class="win">魔王の勝ち！</h3><p class="note">Liella!は${S.days}日以内に草原を抜けられませんでした。<br>（${S.fights.length}戦のうち${G.fight}戦を突破・挑戦${Object.values(G.tries).reduce((a, b) => a + b, 0)}回）</p><button class="btn" id="btn-restart">はじめから遊ぶ</button>`;
+    $('btn-restart').onclick = () => { if (confirm('はじめからにしますか？')) { G = E.newGame(); save(); hub(); } };
+  } else if (G.cleared) {
+    card.innerHTML = `<h3 class="lose">魔王の負け……草原をクリアされた！</h3><p class="note">パーティーは${G.day - 1}日目に草原のボスを倒しました（期限は${S.days}日）。（次のステージは、これから作ります）<br>挑戦の回数：${Object.values(G.tries).reduce((a, b) => a + b, 0)}回</p><button class="btn" id="btn-restart">はじめから遊ぶ</button>`;
     $('btn-restart').onclick = () => { if (confirm('はじめからにしますか？')) { G = E.newGame(); save(); hub(); } };
   } else {
     const tries = G.tries[`${G.stage}-${G.fight}`] || 0;
@@ -145,27 +157,29 @@ function renderLog() {
 }
 
 // ---------------- モンスター作り ----------------
-let D = null;
+let D = null, nameAuto = true;
 function editor() {
   show('editor');
   const f = E.currentFight(G);
   D = JSON.parse(JSON.stringify(G.next || E.blankDesign()));
   if (!G.next && G.fight > 0) D.name = '';
   $('ed-sub').textContent = `${f.boss ? 'ボス' : `${G.fight + 1}戦目`}　使える魔力 ${f.budget}`;
+  nameAuto = !D.name || D.name === E.autoName(D);
   $('ed-name').value = D.name;
-  $('ed-name').oninput = () => { D.name = $('ed-name').value; };
+  $('ed-name').oninput = () => { D.name = $('ed-name').value; nameAuto = !D.name.trim(); };
+  $('ed-autoname').onclick = () => { nameAuto = true; edRender(false); };
   // 前に作ったもの
   const sv = $('ed-saved');
   if (G.designs.length) {
     sv.innerHTML = `<div class="label">前に作ったモンスターを呼ぶ</div><div class="chips">${G.designs.map((x, i) => `<button data-i="${i}">${esc(x.name)}</button>`).join('')}</div>`;
-    for (const b of sv.querySelectorAll('button')) b.onclick = () => { D = JSON.parse(JSON.stringify(G.designs[+b.dataset.i])); $('ed-name').value = D.name; edRender(true); };
+    for (const b of sv.querySelectorAll('button')) b.onclick = () => { D = JSON.parse(JSON.stringify(G.designs[+b.dataset.i])); $('ed-name').value = D.name; nameAuto = D.name === E.autoName(D); edRender(true); };
   } else sv.innerHTML = '';
   edRender(true);
   $('ed-back').onclick = () => hub();
-  $('ed-random').onclick = () => { D = randomDesign(f.budget, ''); $('ed-name').value = D.name; edRender(true); };
+  $('ed-random').onclick = () => { D = randomDesign(f.budget, ''); nameAuto = true; edRender(true); };
   $('ed-ok').onclick = () => {
     if (E.costOf(D) > f.budget) return toast('魔力が足りません');
-    D.name = (D.name || '').trim() || E.lookName(D);
+    D.name = (D.name || '').trim() || E.autoName(D);
     G.next = JSON.parse(JSON.stringify(D));
     const i = G.designs.findIndex(x => x.name === D.name);
     if (i >= 0) G.designs[i] = G.next; else G.designs.push(G.next);
@@ -188,8 +202,10 @@ function edRender(full) {
     $('ed-traits').innerHTML = Object.entries(TRAITS).map(([k, t]) => `<label class="trait"><input type="checkbox" data-k="${k}" ${D.traits.includes(k) ? 'checked' : ''}><span><b>${t.name}</b>（魔力${t.cost}）<small>${t.desc}</small></span></label>`).join('');
     for (const c of $('ed-traits').querySelectorAll('input')) c.onchange = () => { D.traits = D.traits.filter(x => x !== c.dataset.k); if (c.checked) D.traits.push(c.dataset.k); edRender(false); };
   }
+  // 名前のおまかせ：形・属性・能力を変えるたびに付け直す（自分で名前を打ったら変えない）
+  if (nameAuto) { D.name = E.autoName(D); $('ed-name').value = D.name; }
   const ms = E.monStats(D);
-  const val = { hp: `${ms.maxHp}`, atk: E.lvText(D.stats.atk), mag: E.lvText(D.stats.mag), def: E.lvText(D.stats.def), mdef: E.lvText(D.stats.mdef), spd: D.stats.spd >= 8 ? '2回行動' : E.lvText(D.stats.spd) };
+  const val = { hp: `体力${ms.maxHp}`, atk: E.lvText(D.stats.atk), mag: E.lvText(D.stats.mag), def: E.lvText(D.stats.def), mdef: E.lvText(D.stats.mdef), spd: `1ターン${ms.rate.toFixed(1)}回` };
   for (const s of STATS) $('sv-' + s).textContent = `${D.stats[s]}　${val[s]}`;
   for (const k of KEYS) { const v = D.res[k] || 0, el = $('rv-' + k); el.textContent = RES_LABEL[v]; el.className = 'v ' + (v < 0 ? 'good' : v > 0 ? 'bad' : ''); }
   $('ed-preview').innerHTML = monsterSVG(D, { size: 124 });
@@ -228,7 +244,7 @@ function randomDesign(budget, name) {
     if (c <= budget && (!best || c > E.costOf(best))) best = d;
     if (best && E.costOf(best) >= budget - 3) break;
   }
-  if (!best.name) best.name = E.lookName(best);
+  if (!best.name) best.name = E.autoName(best);
   return best;
 }
 
@@ -245,7 +261,7 @@ async function fight() {
   $('sc-mon-num').textContent = '';
   $('sc-party').innerHTML = '';
   $('sc-done').hidden = true; $('sc-skip').hidden = false;
-  $('sc-stand').classList.remove('on');
+  $('sc-cut').classList.remove('on');
   speedUI();
   addEv({ t: 'narr', text: '― 作戦会議 ―', cls: 'round' });
   let ai = null;
@@ -257,37 +273,48 @@ async function fight() {
     if (AI.quotaOut) toast('クラウドAIの今日の無料枠を使い切りました。ここからは「ふつう」で考えます');
   }
   const M = E.meeting(G, d, ai);
-  const res = E.battle(G, d, M);
+  play = { evs: [...M.ev], i: 0, timer: null, done: false, computing: true, idle: false, fast: false };
+  step();
+  const onEvent = e => { if (!play) return; play.evs.push(e); if (play.idle) { play.idle = false; step(); } };
+  const hooks = { onEvent, ...AI.battleHooks() };
+  if (hooks.maxAI) hooks.tactic = (g, dd, st) => AI.tactic(g, dd, st);
+  const res = await E.battle(G, d, M, hooks);
   const rv = E.review(G, d, res);
   if (res.win) E.advance(G);
+  E.checkDeadline(G);
   save();
-  const evs = [...M.ev, ...res.ev, { t: 'narr', text: '― 反省会 ―', cls: 'round' }, ...rv];
-  play = { evs, i: 0, timer: null, done: false };
-  step();
+  if (!play) return;
+  play.evs.push({ t: 'narr', text: '― 反省会 ―', cls: 'round' }, ...rv);
+  if (G.maouWin) play.evs.push({ t: 'lose', text: '期限切れ！ Liella!は草原を抜けられなかった。魔王の勝ち！' });
+  else if (G.cleared) play.evs.push({ t: 'win', text: `草原を突破された！（${G.day - 1}日目）` });
+  play.computing = false;
+  if (play.idle) { play.idle = false; step(); }
 }
 function delayOf(e) {
-  const base = { say: 1700, think: 1250, narr: 1000, round: 450, hit: 850, miss: 800, mon: 950, team: 1100, start: 1000, down: 1100, win: 1600, lose: 1600, lvup: 1200, heal: 850, buff: 850, scan: 900, swap: 1000, hurt: 900 }[e.t] || 900;
-  return base * set.speed;
+  const base = { say: 1700, think: 1250, narr: 1000, round: 450, hit: 850, miss: 800, mon: 950, team: 1100, start: 1000, down: 1100, win: 1600, lose: 1600, lvup: 1200, heal: 850, buff: 850, scan: 900, swap: 1000, hurt: 900, aiwait: 500 }[e.t] || 900;
+  return play?.fast ? 0 : base * set.speed;
 }
 function step() {
   if (!play) return;
-  if (play.i >= play.evs.length) return finish();
+  if (play.i >= play.evs.length) { if (play.computing) { play.idle = true; return; } return finish(); }
   const e = play.evs[play.i++];
-  render(e, true);
+  render(e, !play.fast);
+  if (play.fast) { $('sc-log').scrollTop = $('sc-log').scrollHeight; return step(); }
   play.timer = setTimeout(step, delayOf(e));
 }
 function finish() {
   if (!play || play.done) return;
   play.done = true; clearTimeout(play.timer);
   $('sc-skip').hidden = true; $('sc-done').hidden = false;
-  $('sc-stand').classList.remove('on');
+  $('sc-cut').classList.remove('on');
+  $('sc-log').scrollTop = $('sc-log').scrollHeight;
 }
+// 最後まで：AIを待っている間も、届いたものから一気に出す
 $('sc-skip').onclick = () => {
   if (!play) return;
   clearTimeout(play.timer);
-  while (play.i < play.evs.length) render(play.evs[play.i++], false);
-  finish();
-  $('sc-log').scrollTop = $('sc-log').scrollHeight;
+  play.fast = true;
+  if (!play.idle) step();
 };
 $('sc-done').onclick = () => { play = null; hub(); };
 function speedUI() {
@@ -300,6 +327,8 @@ function addEv(e) {
   if (e.t === 'say') {
     const C = CHARS[e.sp];
     el = h('div', { class: 'ev say', style: `--c:${C.color}` }, `<img src="${face(e.sp)}" alt=""><div class="bub"><div class="who">${C.name}</div>${esc(e.text)}</div>`);
+  } else if (e.t === 'aiwait') {
+    el = h('div', { class: 'ev think' }, `<img src="${face(e.sp)}" alt=""><span>${esc(e.text)}</span>`);
   } else if (e.t === 'think') {
     el = h('div', { class: 'ev think' }, `<img src="${face(e.sp)}" alt=""><span>（${esc(e.text)}）</span>`);
   } else if (e.t === 'win' || e.t === 'lose') {
@@ -337,8 +366,8 @@ function render(e, anim) {
     party.innerHTML = e.team.map(id => `<div class="sp" id="sp-${id}" style="--c:${CHARS[id].color}"><img src="${face(id)}" alt=""><div>${CHARS[id].name}</div><div class="hp"><i style="width:100%"></i></div></div>`).join('');
   }
   if (!anim) { if (e.t === 'win') $('sc-mon').classList.add('dead'); return; }
-  const st = $('sc-stand');
-  if (e.t === 'say') { st.src = stand(e.sp); st.classList.add('on'); clearTimeout(render.st); render.st = setTimeout(() => st.classList.remove('on'), delayOf(e) * 0.9); }
+  const cut = $('sc-cut');
+  if (e.t === 'say') { $('sc-stand').src = stand(e.sp); cut.style.setProperty('--c', CHARS[e.sp].color); cut.classList.add('on'); clearTimeout(render.st); render.st = setTimeout(() => cut.classList.remove('on'), delayOf(e) * 0.9); }
   if (e.t === 'hit') { const m = $('sc-mon'); m.classList.remove('shake'); void m.offsetWidth; m.classList.add('shake'); }
   if ((e.t === 'mon' || e.t === 'hurt') && e.sp) { const el = $('sp-' + e.sp); if (el) { el.classList.remove('hit'); void el.offsetWidth; el.classList.add('hit'); } }
   if (e.t === 'win') $('sc-mon').classList.add('dead');

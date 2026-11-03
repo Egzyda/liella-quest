@@ -9,10 +9,10 @@
 <meta name="apple-mobile-web-app-title" content="リエラクエスト">
 <title>リエラクエスト</title>
 <link rel="manifest" href="manifest.json">
-<link rel="icon" href="img/icon-192.png?v=2026.11.03-4">
-<link rel="apple-touch-icon" href="img/icon-180.png?v=2026.11.03-4">
+<link rel="icon" href="img/icon-192.png?v=2026.11.03-6">
+<link rel="apple-touch-icon" href="img/icon-180.png?v=2026.11.03-6">
 <link href="https://fonts.googleapis.com/css2?family=DotGothic16&family=M+PLUS+Rounded+1c:wght@400;700;800&display=swap" rel="stylesheet" media="print" onload="this.media='all'">
-<link rel="stylesheet" href="style.css?v=2026.11.03-4">
+<link rel="stylesheet" href="style.css?v=2026.11.03-6">
 </head>
 <body>
 <div id="boot">読み込み中…</div>
@@ -34,6 +34,7 @@
     <button id="btn-continue" class="btn primary" hidden>つづきから</button>
     <button id="btn-new" class="btn">はじめから</button>
     <button id="btn-help" class="btn ghost">遊び方</button>
+    <button id="btn-update" class="btn ghost small upd">最新版に更新</button>
     <div id="ver" class="ver"></div>
   </div>
 </section>
@@ -67,7 +68,7 @@
       <div class="ed-cost"><div id="ed-cost-text"></div><div class="meter"><i id="ed-cost-bar"></i></div><div id="ed-cost-note" class="note"></div></div>
     </div>
     <div id="ed-saved" class="ed-row"></div>
-    <div class="ed-row"><div class="label">名前</div><input id="ed-name" maxlength="14"></div>
+    <div class="ed-row"><div class="label">名前</div><div class="name-row"><input id="ed-name" maxlength="16"><button id="ed-autoname" class="btn small ghost">おまかせ</button></div></div>
     <div class="ed-row"><div class="label">形</div><div id="ed-shape" class="chips"></div></div>
     <div class="ed-row"><div class="label">属性（色）</div><div id="ed-elem" class="chips"></div></div>
     <details open class="ed-sec"><summary>能力</summary><div id="ed-stats"></div></details>
@@ -83,7 +84,7 @@
   <div class="stage-area">
     <div id="sc-mon" class="sc-mon"></div>
     <div class="sc-mon-info"><div id="sc-mon-name"></div><div class="hp"><i id="sc-mon-hp"></i></div><div id="sc-mon-num" class="num"></div></div>
-    <img id="sc-stand" class="sc-stand" alt="">
+    <div id="sc-cut" class="sc-cut"><img id="sc-stand" alt=""></div>
   </div>
   <div id="sc-log" class="sc-log"></div>
   <div id="sc-party" class="sc-party"></div>
@@ -98,6 +99,6 @@
 <div id="sheet" class="sheet" hidden><div class="sheet-body"><button id="sheet-close" class="icon-btn sheet-x">×</button><div id="sheet-content"></div></div></div>
 <div id="toast" class="toast"></div>
 
-<script type="module" src="js/main.js?v=2026.11.03-4"></script>
+<script type="module" src="js/main.js?v=2026.11.03-6"></script>
 </body>
 </html>

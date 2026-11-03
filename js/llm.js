@@ -1,8 +1,8 @@
 // AI（作戦会議だけで使う）。頭脳は「ふつう（AIなし）／クラウドAI／PCのAI（Ollama）」
 // AIにはセリフを書かせない。数字の表を見て「誰が出るか・何で攻めるか」を選ばせ、理由を短く言わせるだけ。
 // 答えはプログラムが確かめ、おかしければルールで決める。
-import { IDS, CHARS, KEYS, keyName, ELEM, SHAPES, TRAITS } from './data.js?v=2026.11.03-4';
-import { apt, belief, available, charStats, lookName, mText } from './engine.js?v=2026.11.03-4';
+import { IDS, CHARS, KEYS, keyName, ELEM, SHAPES, TRAITS } from './data.js?v=2026.11.03-6';
+import { apt, belief, available, charStats, lookName, mText } from './engine.js?v=2026.11.03-6';
 
 export const OLLAMA_URL = 'http://localhost:11434';
 export const OLLAMA_MODEL = 'gemma3:12b';
@@ -84,5 +84,37 @@ export const AI = {
       if (!/[ぁ-んァ-ヶ一-龥]/.test(reason)) reason = '';
       return { team, focus, plan, reason: reason ? `AIの作戦：${reason}` : '' };
     } catch (e) { console.warn('AIの作戦会議に失敗', e); return null; }
+  },
+
+  // 戦闘中の大事な場面：攻める／守る／いまのまま／撤退、と主に使う攻撃を選ばせる
+  async tactic(G, d, st) {
+    if (!this.usable()) return null;
+    const TRIG = { pinch: '仲間がピンチ（倒れた人がいる、または体力が少ない）', surprise: '予想と違うことが起きた（効くはずの攻撃が効かない・跳ね返された）', check: '戦いの途中の見直し' };
+    const know = KEYS.map(k => { const x = belief(G, d, k); return x.src === 'known' || x.src === 'fact' ? `${k}:${mText(x.m)}` : null; }).filter(Boolean);
+    const team = st.team.map(x => `${CHARS[x.id].name}(${x.id}) 体力${Math.round(x.hp * 100)}%${x.hp <= 0 ? '・倒れている' : ''} 得意:${KEYS.map(k => [k, apt(G, x.id, k)]).sort((a, b) => b[1] - a[1]).slice(0, 3).map(([k, v]) => k + v).join(' ')}`).join('\n');
+    const recent = st.recent.map(r => `${r.k}→${mText(r.m)}`).join('、');
+    const sys = 'あなたはRPGのパーティーの参謀です。戦いの途中で、これからの方針を決めます。答えはJSONだけ：'
+      + '{"stance":"attack|defend|normal|retreat","focus":"攻撃のキーかnull","reason":"25文字以内の日本語"}。'
+      + 'attack＝回復を減らして攻める、defend＝回復とかばうを優先、retreat＝逃げる（負けになるが全滅よりまし）。'
+      + 'focusは sword spear bow fist fire water wind earth light dark のどれか。効かないと分かっている攻撃は選ばない。';
+    const user = `状況：${TRIG[st.trig]}。${st.round}ターン目。\n敵：${lookName(d)}。敵の残り体力の見た目：約${Math.round(st.monHp * 100)}%。\n`
+      + `いまの方針：${st.stance}、主に使う攻撃：${st.focus || 'なし'}\n図鑑の効き目：${know.join('、') || 'まだ分からない'}\n最近の攻撃の手応え：${recent || 'なし'}\n仲間：\n${team}`;
+    try {
+      const out = await this.ask([{ role: 'system', content: sys }, { role: 'user', content: user }], 160);
+      const s2 = out.indexOf('{'), e = out.lastIndexOf('}');
+      const j = JSON.parse(out.slice(s2, e + 1));
+      const stance = ['attack', 'defend', 'normal', 'retreat'].includes(j.stance) ? j.stance : null;
+      const focus = KEYS.includes(j.focus) ? j.focus : null;
+      let reason = String(j.reason || '').replace(/["「」]/g, '').slice(0, 36);
+      if (!/[ぁ-んァ-ヶ一-龥]/.test(reason)) reason = '';
+      if (!stance && !focus) return null;
+      return { stance, focus, reason };
+    } catch (e) { console.warn('AIの戦闘中の判断に失敗', e); return null; }
+  },
+  // 頭脳ごとの使い方：PCのAIはたくさん、クラウドAIは大事な場面だけ
+  battleHooks() {
+    if (!this.usable()) return {};
+    if (this.mode === 'ollama') return { maxAI: 6, periodic: 3, timeout: 15000 };
+    return { maxAI: 2, periodic: 0, timeout: 7000 };
   },
 };

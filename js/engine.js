@@ -3,8 +3,8 @@
 // ・戦いはターン制。誰が何をするかは、性格と「図鑑」（これまでに見たこと）から決める
 // ・図鑑には見たことだけが書かれる（会心の一撃を「弱点」と勘ちがいすることもある）
 // ・負けたら町に戻って反省し、もう一度挑む
-import { ELEMS, ELEM, FOLK_WEAK, WEAPONS, WEAPON, KEYS, keyName, STATS, STAT, RES_MULT, SHAPES, TRAITS, STAGES, IDS, CHARS } from './data.js?v=2026.11.03-4';
-import { say, nameOf } from './talk.js?v=2026.11.03-4';
+import { ELEMS, ELEM, FOLK_WEAK, WEAPONS, WEAPON, KEYS, keyName, STATS, STAT, RES_MULT, SHAPES, TRAITS, STAGES, IDS, CHARS } from './data.js?v=2026.11.03-6';
+import { say, nameOf } from './talk.js?v=2026.11.03-6';
 
 export const rnd = { f: Math.random };
 const R = () => rnd.f();
@@ -16,19 +16,18 @@ const gauss = () => (R() + R() + R() - 1.5) / 1.5;
 export function newGame() {
   const party = {};
   for (const id of IDS) party[id] = { lv: 1, exp: 0, mast: {}, tired: 0, hurt: 0 };
-  return { v: 1, stage: 0, fight: 0, party, book: {}, designs: [], next: null, tries: {}, history: [], cleared: false, day: 1 };
+  return { v: 1, stage: 0, fight: 0, party, book: {}, designs: [], next: null, tries: {}, history: [], cleared: false, day: 1, stageStart: 1, maouWin: false };
 }
 
 // ---------------- モンスター ----------------
 export function blankDesign() {
-  return { name: 'はじまりのスライム', shape: 'slime', elem: 'water', stats: { hp: 4, atk: 3, mag: 2, def: 3, mdef: 3, spd: 3 }, res: {}, traits: [] };
+  return { name: 'アクアスライム', shape: 'slime', elem: 'water', stats: { hp: 4, atk: 3, mag: 2, def: 3, mdef: 3, spd: 3 }, res: {}, traits: [] };
 }
-const statCost = v => v + Math.max(0, v - 5) * 0.6 + Math.max(0, v - 8);
 const RES_COST = { 1: 2, 2: 4, 3: 7 };
-// 魔力（コスト）の計算：強い数字ほど割高。弱点を作ると少し戻ってくる（最大9まで）
+// 魔力（コスト）の計算：能力は1ポイント＝魔力1（どの能力も同じ値段・同じくらいの強さ）。弱点を作ると少し戻ってくる（最大9まで）
 export function costOf(d) {
   let c = 0;
-  for (const s of STATS) c += statCost(d.stats[s] || 0);
+  for (const s of STATS) c += d.stats[s] || 0;
   let refund = 0;
   for (const k of KEYS) {
     const r = d.res[k] || 0;
@@ -41,12 +40,32 @@ export function costOf(d) {
 }
 export const lookKey = d => `${d.shape}:${d.elem}`;
 export const lookName = d => `${ELEM[d.elem].name}の${SHAPES[d.shape].name}`;
+// どの能力も1ポイントで強さが同じくらい（約1割）上がるようにしてある
+//  体力：最大体力 / 物理攻撃・魔法攻撃：合計で攻撃の強さが決まる（多い方の種類で攻撃しやすい）
+//  物理防御・魔法防御：受けるダメージが減る / 素早さ：1ターンに動ける回数（10で約2回）
+export const MON = { hp0: 210, hpK: 0.075, pow0: 23, powK: 0.045, defK: 0.4, mdefK: 0.22, spdK: 0.032, magX: 1 };
 export function monStats(d) {
-  const s = d.stats;
+  const s = d.stats, sum = (s.atk || 0) + (s.mag || 0);
   return {
-    maxHp: Math.round(110 + s.hp * 62), atk: 7 + s.atk * 3.1, mag: 7 + s.mag * 3.1,
-    defF: 1 - s.def * 0.055, mdefF: 1 - s.mdef * 0.055, spd: 4 + s.spd * 1.4, twice: s.spd >= 8,
+    maxHp: Math.round(MON.hp0 * (1 + MON.hpK * s.hp)),
+    pow: MON.pow0 * (1 + MON.powK * sum), magShare: sum ? s.mag / sum : 0,
+    defF: 1 / (1 + MON.defK * s.def), mdefF: 1 / (1 + MON.mdefK * s.mdef),
+    spd: 4 + s.spd * 1.2, rate: 1 + MON.spdK * s.spd,
   };
+}
+// モンスターの名前（おまかせ）：属性・特性・目立つ能力・種族から組み立てる
+const NAME_ELEM = { fire: 'フレイム', water: 'アクア', wind: 'ウィンド', earth: 'ガイア', light: 'ホーリー', dark: 'ダーク' };
+const NAME_TRAIT = { fly: 'スカイ', regen: 'リジェネ', poison: 'ポイズン', reflect: 'ミラー', rage: 'バーサク', sweep: 'ストーム' };
+const NAME_STAT = { hp: 'ジャイアント', atk: 'マッスル', mag: 'ウィザード', def: 'アイアン', mdef: 'ルーン', spd: 'ソニック' };
+const NAME_SHAPE = { slime: 'スライム', beast: 'ビースト', bird: 'ガルーダ', golem: 'ゴーレム', ghost: 'ゴースト', dragon: 'ドラゴン', knight: 'ナイト' };
+export function autoName(d) {
+  const parts = [];
+  const top = STATS.map(k => [k, d.stats[k] || 0]).sort((a, b) => b[1] - a[1])[0];
+  if (top[1] >= 8) parts.push(NAME_STAT[top[0]]);
+  parts.push(NAME_ELEM[d.elem]);
+  if (d.traits[0]) parts.push(NAME_TRAIT[d.traits[0]]);
+  parts.push(NAME_SHAPE[d.shape]);
+  return parts.join('');
 }
 export function currentFight(G) { return STAGES[G.stage]?.fights[G.fight]; }
 
@@ -68,7 +87,7 @@ export function apt(G, id, k) {
 }
 function power(G, id, k, st) {
   const a = apt(G, id, k);
-  return (WEAPON[k] ? st.atk : st.mag) * (0.55 + a * 0.11);
+  return (WEAPON[k] ? st.atk * 1.2 : st.mag) * (0.55 + a * 0.11);
 }
 const hitChance = (G, id, k, flyKnown) => {
   if (!WEAPON[k]) return 1;
@@ -85,13 +104,17 @@ function bookOf(G, d) {
 }
 export function bookEntry(G, d) { return G.book[lookKey(d)] || null; }
 // 見た目から思いこむ効き目（言い伝え）
+// 形ごとの思いこみ（スライムは斬れる・鳥は弓・ゴーレムは拳で砕く…）
+const FOLK_SHAPE = {
+  slime: { sword: 1.3, fist: 0.8 }, beast: { spear: 1.35, bow: 1.15 }, bird: { bow: 1.45, fist: 0.8 },
+  golem: { fist: 1.35, sword: 0.75, bow: 0.75 }, ghost: { sword: 0.7, spear: 0.7, bow: 0.7, fist: 0.7, light: 1.3 },
+  dragon: { spear: 1.3, sword: 1.1 }, knight: { fist: 1.3, sword: 0.8 },
+};
 function folkMult(d, k) {
-  if (ELEM[k] && FOLK_WEAK[d.elem] === k) return 1.5;
-  if (k === d.elem) return 0.6;
-  if (d.shape === 'ghost' && WEAPON[k]) return 0.7;
-  if (d.shape === 'ghost' && k === 'light') return 1.3;
-  if (d.shape === 'golem' && (k === 'sword' || k === 'bow')) return 0.8;
-  return 1;
+  let m = FOLK_SHAPE[d.shape]?.[k] || 1;
+  if (ELEM[k] && FOLK_WEAK[d.elem] === k) m *= 1.35;
+  if (k === d.elem) m *= 0.6;
+  return m;
 }
 // 効き目の見こみ。src：どこからそう思ったか（known 図鑑／fact 分析／folk 見た目／none わからない）
 export function belief(G, d, k) {
@@ -202,7 +225,9 @@ export function meeting(G, d, ai = null) {
 
 // ---------------- 戦闘 ----------------
 // 戦いを最後まで計算して、見せる出来事（ev）を返す。図鑑と仲間の成長もここで書きかえる
-export function battle(G, d, M) {
+// hooks.onEvent：出来事が起きるたびに呼ぶ（画面は計算しながら順に見せる）
+// hooks.tactic：大事な場面でAIに作戦を聞く（なければルールで決める）。maxAI 回まで・timeout ミリ秒で見切る
+export async function battle(G, d, M, hooks = {}) {
   const ev = [];
   const B = bookOf(G, d);
   B.met++;
@@ -215,7 +240,9 @@ export function battle(G, d, M) {
   const join = id => { st[id] = charStats(G, id); hp[id] = st[id].maxHp; used[id] = used[id] || {}; };
   team.forEach(join);
   const snap = () => ({ mon: mon.hp, max: mon.max, team: team.slice(), hp: { ...hp }, max2: Object.fromEntries(team.map(id => [id, st[id].maxHp])) });
-  const push = e => ev.push({ ...e, s: snap() });
+  const push = e => { const x = { ...e, s: snap() }; ev.push(x); hooks.onEvent?.(x); };
+  let stance = 'normal', pinchDone = false, surpriseFlag = false, lastTactic = 0, aiUsed = 0, tactics = 0;
+  const recent = [];
   const alive = () => team.filter(id => hp[id] > 0);
   push({ t: 'start', text: `${d.name}（${lookName(d)}）との戦いが始まった！` });
 
@@ -243,16 +270,17 @@ export function battle(G, d, M) {
       }
       const top = Math.max(...KEYS.map(x => apt(G, id, x)));
       if (a === top) v *= 1 + P.pride * 0.03;
-      opts.push({ type: 'atk', k, v, reason, m: bl.m, src: bl.src });
+      opts.push({ type: 'atk', k, v: v * (stance === 'attack' ? 1.2 : 1), reason, m: bl.m, src: bl.src });
     }
-    const allyLow = alive().filter(x => hp[x] / st[x].maxHp < 0.45).sort((a, b) => hp[a] / st[a].maxHp - hp[b] / st[b].maxHp)[0];
+    const lowT = stance === 'defend' ? 0.6 : stance === 'attack' ? 0.25 : 0.45;
+    const allyLow = alive().filter(x => hp[x] / st[x].maxHp < lowT).sort((a, b) => hp[a] / st[a].maxHp - hp[b] / st[b].maxHp)[0];
     const avgDmg = alive().reduce((a, x) => a + charStats(G, x).atk, 0) / Math.max(1, alive().length);
     if (allyLow && apt(G, id, 'heal') >= 3) {
       const amt = s.mag * (0.6 + apt(G, id, 'heal') * 0.12) * 1.6;
-      opts.push({ type: 'heal', target: allyLow, v: amt * (1 + P.kind / 12) * (hp[allyLow] / st[allyLow].maxHp < 0.25 ? 1.6 : 1), reason: 'heal' });
+      opts.push({ type: 'heal', target: allyLow, v: amt * (1 + P.kind / 12) * (hp[allyLow] / st[allyLow].maxHp < 0.25 ? 1.6 : 1) * (stance === 'defend' ? 1.6 : 1), reason: 'heal' });
     }
     if (!buff && apt(G, id, 'song') >= 5 && round <= 3 && alive().length >= 3) opts.push({ type: 'song', v: avgDmg * alive().length * 0.32 * (apt(G, id, 'song') / 10) * 1.6, reason: 'song' });
-    if (allyLow && allyLow !== id && apt(G, id, 'guard') >= 5 && guardBy !== id && hp[id] / s.maxHp > 0.5) opts.push({ type: 'guard', target: allyLow, v: ms.atk * 1.3 * (P.kind / 8), reason: 'guard' });
+    if (allyLow && allyLow !== id && apt(G, id, 'guard') >= 5 && guardBy !== id && hp[id] / s.maxHp > 0.5) opts.push({ type: 'guard', target: allyLow, v: ms.pow * 1.3 * (P.kind / 8) * (stance === 'defend' ? 1.6 : 1), reason: 'guard' });
     const unknown = KEYS.filter(k => B.res[k] == null).length + (B.stats.hp == null ? 1 : 0);
     if (apt(G, id, 'scan') >= 4 && unknown > 3 && round <= 3 && scanDone < 2) opts.push({ type: 'scan', v: avgDmg * (0.6 + P.logic * 0.08) * (M.plan === 'explore' ? 1.4 : 1), reason: 'scan' });
     // 自分が役に立てないなら、控えと交代
@@ -295,7 +323,7 @@ export function battle(G, d, M) {
     if (!WEAPON[k] && d.traits.includes('reflect') && R() < 0.3) {
       const dm = Math.round(power(G, id, k, s) * 0.5 * (1 - st[id].mdef * 0.02));
       hp[id] = Math.max(0, hp[id] - dm);
-      const first = !B.traits.reflect; B.traits.reflect = true;
+      const first = !B.traits.reflect; B.traits.reflect = true; if (first) surpriseFlag = true;
       push({ t: 'hurt', sp: id, text: `${d.name}が${keyName(k)}を跳ね返した！ ${nm}に${dm}のダメージ！` });
       if (first) push(say(id, 'reflect_found', {}));
       if (hp[id] <= 0) down(id);
@@ -316,6 +344,8 @@ export function battle(G, d, M) {
     else B.obs[k] = { v: seen, n: 1 };
     const verb = WEAPON[k] ? `${nm}は${WEAPON[k].name}で${WEAPON[k].verb}` : `${nm}は${keyName(k)}を唱えた`;
     push({ t: 'hit', sp: id, k, text: `${verb}！${crit ? ' 会心の一撃！' : ''} ${dmg === 0 ? 'まったく効いていない！' : dmg + 'のダメージ！'}`, crit, dmg });
+    recent.push({ k, m: seen });
+    if (surprise || (k === M.focus && seen <= 0.6)) surpriseFlag = true;
     if (surprise) push(say(id, 'surprise', { k: keyName(k) }));
     else if (seen >= 1.45 && !saidWeak.has(k)) { saidWeak.add(k); push(say(id, 'weak', { k: keyName(k) })); }
     else if (seen <= 0.5 && !saidRes.has(k)) { saidRes.add(k); push(say(id, 'resist', { k: keyName(k) })); }
@@ -392,9 +422,8 @@ export function battle(G, d, M) {
 
   function monAct() {
     const al = alive(); if (!al.length) return;
-    let atkV = ms.atk * (mon.raged ? 1.5 : 1), magV = ms.mag * (mon.raged ? 1.5 : 1);
-    const useMag = magV > atkV ? R() < 0.8 : R() < 0.2 * (magV / atkV);
-    const pw = useMag ? magV : atkV;
+    const useMag = R() < ms.magShare;
+    const pw = ms.pow * (mon.raged ? 1.5 : 1) * (useMag ? MON.magX : 1);
     const hitOne = (id, mult) => {
       const defv = useMag ? st[id].mdef : st[id].def;
       let dm = Math.max(1, Math.round(pw * 1.7 * (30 / (30 + defv * 1.5)) * mult * (0.85 + R() * 0.3)));
@@ -421,14 +450,70 @@ export function battle(G, d, M) {
     }
   }
 
-  let outcome = null, round = 0;
+  // 作戦の見直し。AIの答え → なければルール
+  async function tactic(trig, round) {
+    const al = alive();
+    const strat = [...al].sort((a, b) => apt(G, b, 'scan') + CHARS[b].p.logic - apt(G, a, 'scan') - CHARS[a].p.logic)[0];
+    const leader = [...al].sort((a, b) => CHARS[b].p.careful - CHARS[a].p.careful)[0];
+    if (!strat) return null;
+    let t = null, byAI = false;
+    if (hooks.tactic && aiUsed < (hooks.maxAI || 0)) {
+      aiUsed++;
+      push({ t: 'aiwait', sp: strat, text: 'AIが作戦を考えています…' });
+      const state = {
+        trig, round, monHp: mon.hp / mon.max, focus: M.focus, stance,
+        team: team.map(id => ({ id, hp: hp[id] / st[id].maxHp })), bench: bench.slice(),
+        recent: recent.slice(-8),
+      };
+      try { t = await Promise.race([hooks.tactic(G, d, state), new Promise(r => setTimeout(() => r(null), hooks.timeout || 8000))]); } catch { t = null; }
+      if (t) byAI = true;
+    }
+    if (!t && trig !== 'check') t = ruleTactic(trig, leader);
+    if (!t) return null;
+    if (t.reason) push({ t: 'think', sp: strat, text: (byAI ? 'AIの判断：' : '') + t.reason });
+    if (t.stance === 'retreat') { push(say(leader, 'retreat', {})); return 'retreat'; }
+    let changed = false;
+    if (t.focus && KEYS.includes(t.focus) && t.focus !== M.focus) {
+      const bl = belief(G, d, t.focus);
+      if (!(['known', 'fact'].includes(bl.src) && bl.m <= 0.6)) { M.focus = t.focus; M.plan = 'focus'; push(say(strat, 'order_focus', { k: keyName(t.focus) })); changed = true; }
+    }
+    if (t.stance && t.stance !== stance && ['attack', 'defend', 'normal'].includes(t.stance)) {
+      stance = t.stance;
+      if (stance !== 'normal') push(say(strat, stance === 'attack' ? 'order_attack' : 'order_defend', {}));
+      changed = true;
+    }
+    if (!changed && byAI) push({ t: 'think', sp: strat, text: 'いまの作戦のままでいい。' });
+    return null;
+  }
+  function ruleTactic(trig, leader) {
+    const al = alive(), downN = team.length - al.length;
+    if (trig === 'pinch') {
+      const C = CHARS[leader].p;
+      if (downN >= 2 && mon.hp / mon.max > 0.5 && C.careful >= 6) return { stance: 'retreat', reason: '仲間が倒れすぎた。ここは引くべき。' };
+      if (mon.hp / mon.max < 0.3) return { stance: 'attack', reason: 'あと少しで倒せる。押し切る！' };
+      if (C.careful + C.kind >= 11) return { stance: 'defend', reason: '危ない。まずは守りを固めよう。' };
+      return { stance: 'attack', reason: 'やられる前に、攻めて倒す！' };
+    }
+    // 予想外：いちばん効きそうな攻撃に切りかえる
+    let best = null;
+    for (const k of KEYS) {
+      const bl = belief(G, d, k);
+      const v = Math.max(...al.map(id => power(G, id, k, st[id]))) * bl.m;
+      if (!best || v > best.v) best = { k, v };
+    }
+    if (best && best.k !== M.focus) return { focus: best.k, reason: `思っていたのと違う。${keyName(best.k)}に切りかえよう。` };
+    return null;
+  }
+
+  let outcome = null, round = 0, monAcc = 0;
   const hpHist = [];
   while (!outcome) {
     round++;
     if (round > 18) { outcome = 'timeup'; break; }
     push({ t: 'round', text: `― ${round}ターン目 ―` });
-    const order = [...alive().map(id => ({ id, sp: st[id].spd + R() * 4 })), { id: 'mon', sp: ms.spd + R() * 4 }];
-    if (ms.twice) order.push({ id: 'mon', sp: ms.spd * 0.4 });
+    const order = alive().map(id => ({ id, sp: st[id].spd + R() * 4 }));
+    monAcc += ms.rate;
+    for (let i = 0; monAcc >= 1; i++, monAcc--) order.push({ id: 'mon', sp: i === 0 ? ms.spd + R() * 4 : R() * 14 });
     order.sort((a, b) => b.sp - a.sp);
     for (const o of order) {
       if (o.id === 'mon') monAct(); else act(o.id, round);
@@ -454,6 +539,17 @@ export function battle(G, d, M) {
       push({ t: 'mon', text: `${d.name}は怒り狂っている！ 攻撃が激しくなった！` });
     }
     if (buff) buff--;
+    // 大事な場面：作戦を見直す（AIがあればAIに聞く）
+    const downNow = team.length - alive().length;
+    const avgHp = alive().reduce((a, x) => a + hp[x] / st[x].maxHp, 0) / Math.max(1, alive().length);
+    let trig = null;
+    if (!pinchDone && (downNow >= 1 || avgHp < 0.45)) { trig = 'pinch'; pinchDone = true; }
+    else if (surpriseFlag) { trig = 'surprise'; surpriseFlag = false; }
+    else if (hooks.periodic && hooks.tactic && aiUsed < (hooks.maxAI || 0) && round - lastTactic >= hooks.periodic && round >= 2) trig = 'check';
+    if (trig && tactics < 6) {
+      lastTactic = round; tactics++;
+      if ((await tactic(trig, round)) === 'retreat') { outcome = 'retreat'; break; }
+    }
     hpHist.push(mon.hp);
     // 削れていない：3ターン前とほとんど変わらないなら、慎重な人が「このままでは勝てない」と気づく
     if (round >= 6 && hpHist.length >= 4 && mon.hp >= hpHist[hpHist.length - 4] - mon.max * 0.05 && mon.hp / mon.max > 0.4) {
@@ -524,12 +620,21 @@ export function review(G, d, res) {
     if (A.good.length) ev.push(say(sp, 'review_lose_good', { k: keyName(A.good[0].k) }));
     else if (A.bad.length) ev.push(say(sp, 'review_lose_bad', { k: keyName(A.bad[0].k) }));
     else ev.push(say(sp, 'review_lose', {}));
+    const left = daysLeft(G);
+    if (left > 0 && left <= 3) ev.push({ t: 'narr', text: `魔王が力を取り戻すまで、あと${left}日。` });
     const hurt = IDS.filter(id => G.party[id].hurt);
     if (hurt.length) ev.push({ t: 'narr', text: `${hurt.map(nameOf).join('・')}はケガで次の戦いを休む。` });
   }
   return ev;
 }
 
+// 期限：あと何日戦えるか（0になったら、それ以上は挑めない）
+export function daysLeft(G) { return (STAGES[G.stage]?.days || 99) - (G.day - (G.stageStart || 1)); }
+// 戦いのあとで呼ぶ：期限切れなら魔王の勝ち
+export function checkDeadline(G) {
+  if (!G.cleared && !G.maouWin && daysLeft(G) <= 0) G.maouWin = true;
+  return G.maouWin;
+}
 // 勝ったら次の戦いへ
 export function advance(G) {
   const S = STAGES[G.stage];

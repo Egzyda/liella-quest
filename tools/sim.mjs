@@ -41,7 +41,7 @@ for (let g = 0; g < N; g++) {
     if (!G.next) G.next = randomDesign(f.budget, STYLE === 'mix' ? (R() < 0.3 ? 'smart' : '') : STYLE);
     try {
       const M = E.meeting(G, G.next);
-      const res = E.battle(G, G.next, M);
+      const res = await E.battle(G, G.next, M);
       const rv = E.review(G, G.next, res);
       for (const e of [...M.ev, ...res.ev, ...rv]) { total++; if (e.t === 'say' && e.text === '……。') { empty++; out[e.sp + ':' + e.key] = 1; } }
       fights++; rounds.push(res.round);
@@ -51,5 +51,8 @@ for (let g = 0; g < N; g++) {
   tries.push(per);
 }
 const avg = a => (a.reduce((x, y) => x + y, 0) / a.length).toFixed(2);
+const totals = tries.map(t => t.reduce((a, b) => a + b, 0)).sort((a, b) => a - b);
+console.log('魔王の勝ち（期限' + STAGES[0].days + '日）', Math.round(totals.filter(t => t > STAGES[0].days).length / totals.length * 100) + '%');
+console.log('草原クリアまでの日数 中央値', totals[Math.floor(totals.length / 2)], '80%の人', totals[Math.floor(totals.length * 0.8)], '最大', totals[totals.length - 1]);
 console.log(`ゲーム${N} 戦闘${fights} 勝率${(wins / fights * 100).toFixed(0)}% 平均ターン${avg(rounds)} エラー${err} セリフ抜け${empty}/${total}`, Object.keys(out).slice(0, 10));
 for (let i = 0; i < 4; i++) console.log(`戦い${i + 1}：クリアまでの挑戦回数 平均${avg(tries.map(t => t[i] || 0))} 最大${Math.max(...tries.map(t => t[i] || 0))}`);
