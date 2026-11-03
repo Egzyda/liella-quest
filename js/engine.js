@@ -3,8 +3,8 @@
 // ・戦いはターン制。誰が何をするかは、性格と「図鑑」（これまでに見たこと）から決める
 // ・図鑑には見たことだけが書かれる（会心の一撃を「弱点」と勘ちがいすることもある）
 // ・負けたら町に戻って反省し、もう一度挑む
-import { ELEMS, ELEM, FOLK_WEAK, WEAPONS, WEAPON, KEYS, keyName, STATS, STAT, RES_MULT, SHAPES, TRAITS, STAGES, IDS, CHARS } from './data.js?v=2026.11.03-6';
-import { say, nameOf } from './talk.js?v=2026.11.03-6';
+import { ELEMS, ELEM, FOLK_WEAK, WEAPONS, WEAPON, KEYS, keyName, STATS, STAT, RES_MULT, SHAPES, TRAITS, STAGES, IDS, CHARS } from './data.js?v=2026.11.03-7';
+import { say, nameOf } from './talk.js?v=2026.11.03-7';
 
 export const rnd = { f: Math.random };
 const R = () => rnd.f();
@@ -459,7 +459,7 @@ export async function battle(G, d, M, hooks = {}) {
     let t = null, byAI = false;
     if (hooks.tactic && aiUsed < (hooks.maxAI || 0)) {
       aiUsed++;
-      push({ t: 'aiwait', sp: strat, text: 'AIが作戦を考えています…' });
+      push({ t: 'aiwait', sp: strat, text: `${nameOf(strat)}が考えている……` });
       const state = {
         trig, round, monHp: mon.hp / mon.max, focus: M.focus, stance,
         team: team.map(id => ({ id, hp: hp[id] / st[id].maxHp })), bench: bench.slice(),
@@ -470,7 +470,7 @@ export async function battle(G, d, M, hooks = {}) {
     }
     if (!t && trig !== 'check') t = ruleTactic(trig, leader);
     if (!t) return null;
-    if (t.reason) push({ t: 'think', sp: strat, text: (byAI ? 'AIの判断：' : '') + t.reason });
+    if (t.reason) push({ t: 'think', sp: strat, text: t.reason });
     if (t.stance === 'retreat') { push(say(leader, 'retreat', {})); return 'retreat'; }
     let changed = false;
     if (t.focus && KEYS.includes(t.focus) && t.focus !== M.focus) {

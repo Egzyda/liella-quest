@@ -1,8 +1,8 @@
 // AI（作戦会議だけで使う）。頭脳は「ふつう（AIなし）／クラウドAI／PCのAI（Ollama）」
 // AIにはセリフを書かせない。数字の表を見て「誰が出るか・何で攻めるか」を選ばせ、理由を短く言わせるだけ。
 // 答えはプログラムが確かめ、おかしければルールで決める。
-import { IDS, CHARS, KEYS, keyName, ELEM, SHAPES, TRAITS } from './data.js?v=2026.11.03-6';
-import { apt, belief, available, charStats, lookName, mText } from './engine.js?v=2026.11.03-6';
+import { IDS, CHARS, KEYS, keyName, ELEM, SHAPES, TRAITS } from './data.js?v=2026.11.03-7';
+import { apt, belief, available, charStats, lookName, mText } from './engine.js?v=2026.11.03-7';
 
 export const OLLAMA_URL = 'http://localhost:11434';
 export const OLLAMA_MODEL = 'gemma3:12b';
@@ -82,7 +82,7 @@ export const AI = {
       const plan = ['focus', 'explore', 'balanced'].includes(j.plan) ? j.plan : 'balanced';
       let reason = String(j.reason || '').replace(/["「」]/g, '').slice(0, 40);
       if (!/[ぁ-んァ-ヶ一-龥]/.test(reason)) reason = '';
-      return { team, focus, plan, reason: reason ? `AIの作戦：${reason}` : '' };
+      return { team, focus, plan, reason };
     } catch (e) { console.warn('AIの作戦会議に失敗', e); return null; }
   },
 

@@ -1,9 +1,9 @@
 // 画面と操作：タイトル・魔王の玉座・モンスター作り・作戦会議と戦闘の再生
-import { IDS, CHARS, ELEMS, ELEM, WEAPONS, WEAPON, KEYS, keyName, STATS, STAT, SHAPES, TRAITS, STAGES, RES_MULT } from './data.js?v=2026.11.03-6';
-import * as E from './engine.js?v=2026.11.03-6';
-import { monsterSVG } from './monster.js?v=2026.11.03-6';
-import { AI, OLLAMA_MODEL } from './llm.js?v=2026.11.03-6';
-import { VERSION } from './version.js?v=2026.11.03-6';
+import { IDS, CHARS, ELEMS, ELEM, WEAPONS, WEAPON, KEYS, keyName, STATS, STAT, SHAPES, TRAITS, STAGES, RES_MULT } from './data.js?v=2026.11.03-7';
+import * as E from './engine.js?v=2026.11.03-7';
+import { monsterSVG } from './monster.js?v=2026.11.03-7';
+import { AI, OLLAMA_MODEL } from './llm.js?v=2026.11.03-7';
+import { VERSION } from './version.js?v=2026.11.03-7';
 
 const $ = id => document.getElementById(id);
 const h = (tag, attrs = {}, html = '') => { const e = document.createElement(tag); for (const [k, v] of Object.entries(attrs)) { if (k === 'on') for (const [ev, fn] of Object.entries(v)) e.addEventListener(ev, fn); else if (k === 'style') e.style.cssText = v; else e.setAttribute(k, v); } if (html) e.innerHTML = html; return e; };
@@ -266,10 +266,11 @@ async function fight() {
   addEv({ t: 'narr', text: '― 作戦会議 ―', cls: 'round' });
   let ai = null;
   if (AI.usable()) {
-    const wait = addEv({ t: 'narr', text: '（AIが作戦を考えています…）' });
+    // 見た目は参謀が考えているように（AIの名前は出さない）
+    const strat = E.available(G).sort((a, b) => E.apt(G, b, 'scan') + CHARS[b].p.logic * 0.3 - (E.apt(G, a, 'scan') + CHARS[a].p.logic * 0.3))[0];
+    const wait = addEv({ t: 'aiwait', sp: strat, text: `${CHARS[strat].name}が作戦を考えている……` });
     ai = await AI.plan(G, d);
     wait.remove();
-    if (!ai) addEv({ t: 'narr', text: '（AIの答えが使えなかったので、いつものやり方で決めます）' });
     if (AI.quotaOut) toast('クラウドAIの今日の無料枠を使い切りました。ここからは「ふつう」で考えます');
   }
   const M = E.meeting(G, d, ai);
