@@ -1,7 +1,18 @@
 // 自動テスト：魔王がランダムにモンスターを作り、ステージを最後まで進める。エラー・セリフ抜け・バランスを確認
 // 使い方：node tools/sim.mjs 50
 import * as E from '../js/engine.js';
-import { STATS, KEYS, TRAITS, SHAPES, ELEMS, STAGES, FOLK_WEAK } from '../js/data.js';
+import { STATS, KEYS, TRAITS, SHAPES, ELEMS, STAGES, FOLK_WEAK, IDS } from '../js/data.js';
+import { freePhase, learnable } from '../js/camp.js';
+// 4番目：魔王の自由行動（mix／none／power／learn／scout／assassin）、5番目：号令（auto／none）
+const ACT = process.argv[4] || 'mix', CMD = process.argv[5] || 'auto';
+function maouAct(G) {
+  const t = ACT === 'mix' ? pick(['power', 'learn', 'assassin', 'learn']) : ACT;
+  if (t === 'none') return null;
+  if (t === 'learn') { const l = learnable(G); return l.length ? { type: 'learn', cmd: pick(l) } : { type: 'power' }; }
+  if (t === 'scout') return { type: 'scout', ids: [pick(IDS), pick(IDS)] };
+  if (t === 'assassin') { const av = IDS.filter(id => !G.party[id].hurt).sort((a, b) => G.party[b].lv - G.party[a].lv); return { type: 'assassin', id: av[0] || IDS[0] }; }
+  return { type: t };
+}
 const STYLE = process.argv[3] || 'mix';
 const N = +process.argv[2] || 30;
 const R = Math.random, pick = a => a[Math.floor(R() * a.length)];
@@ -41,12 +52,13 @@ for (let g = 0; g < N; g++) {
     if (!G.next) G.next = randomDesign(f.budget, STYLE === 'mix' ? (R() < 0.3 ? 'smart' : '') : STYLE);
     try {
       const M = E.meeting(G, G.next);
-      const res = await E.battle(G, G.next, M);
+      const res = await E.battle(G, G.next, M, { auto: CMD === 'auto' });
       const rv = E.review(G, G.next, res);
       for (const e of [...M.ev, ...res.ev, ...rv]) { total++; if (e.t === 'say' && e.text === '……。') { empty++; out[e.sp + ':' + e.key] = 1; } }
       fights++; rounds.push(res.round);
       if (res.win) { wins++; per.push(G.tries[`${G.stage}-${G.fight}`]); E.advance(G); }
       E.checkDeadline(G);
+      if (!G.cleared && !G.maouWin) freePhase(G, maouAct(G));
     } catch (e) { err++; console.error(e); break; }
   }
   if (G.maouWin) maou++; else tries.push(per);
@@ -56,4 +68,4 @@ const totals = tries.map(t => t.reduce((a, b) => a + b, 0)).sort((a, b) => a - b
 console.log('魔王の勝ち', Math.round(maou / N * 100) + '%');
 if (totals.length) console.log('（突破されたとき）日数 中央値', totals[Math.floor(totals.length / 2)], '80%の人', totals[Math.floor(totals.length * 0.8)], '最大', totals[totals.length - 1]);
 console.log(`ゲーム${N} 戦闘${fights} 勝率${(wins / fights * 100).toFixed(0)}% 平均ターン${avg(rounds)} エラー${err} セリフ抜け${empty}/${total}`, Object.keys(out).slice(0, 10));
-for (let i = 0; i < 4 && tries.length; i++) console.log(`戦い${i + 1}：突破までの挑戦回数 平均${avg(tries.map(t => t[i] || 0))} 最大${Math.max(...tries.map(t => t[i] || 0))}`);
+for (let i = 0; i < 4 && tries.length; i++) console.log(`戦い${i + 1}：1回目で突破 ${Math.round(tries.filter(t => t[i] === 1).length / Math.max(1, tries.filter(t => t[i]).length) * 100)}%　突破までの挑戦回数 平均${avg(tries.map(t => t[i] || 0))} 最大${Math.max(...tries.map(t => t[i] || 0))}`);

@@ -23,7 +23,8 @@ export const WEAPON = {
 };
 // 攻撃のしかた（キー）：武器4種＋属性6種
 export const KEYS = [...WEAPONS, ...ELEMS];
-export const keyName = k => (WEAPON[k] ? WEAPON[k].name : ELEM[k] ? ELEM[k].name + '魔法' : k);
+export const SKILL_NAME = { heal: '回復', song: '歌', guard: '盾', scan: '分析' };
+export const keyName = k => (WEAPON[k] ? WEAPON[k].name : ELEM[k] ? ELEM[k].name + '魔法' : SKILL_NAME[k] || k);
 
 // モンスターの数値（シークバー）
 export const STATS = ['hp', 'atk', 'mag', 'def', 'mdef', 'spd'];
@@ -52,10 +53,10 @@ export const TRAITS = {
 // ステージ：戦い4つ（最後はボス）。魔力＝モンスターに使えるポイント。
 // days＝その戦いにたどり着いたときに増える日数（1回戦うと1日。残った日は持ちこし。0になったら魔王の勝ち）。後の戦いほど強いので日数も多い
 export const STAGES = [
-  { name: '草原', bg: 'plain', fights: [{ budget: 34, days: 3 }, { budget: 42, days: 3 }, { budget: 50, days: 4 }, { budget: 64, boss: true, days: 5 }] },
+  { name: '草原', bg: 'plain', fights: [{ budget: 38, days: 3 }, { budget: 45, days: 3 }, { budget: 50, days: 4 }, { budget: 64, boss: true, days: 5 }] },
 ];
 // 魔王の成長：戦うたびに使える魔力が増える（撃退したときは多め）
-export const MAOU_GROW = { win: 3, lose: 1 };
+export const MAOU_GROW = { win: 2, lose: 1 };
 
 // Liella! 11人（呼び方は資料「口調一覧」と同じ）
 // base：体力・力・魔力・守り・魔法の守り・素早さ（レベル1のとき）
@@ -181,3 +182,45 @@ export function charGear(id) {
   const w = WEAPONS.slice().sort((a, b) => C.w[b] - C.w[a])[0];
   return [WEAPON[w].name, ...(C.s.guard >= 6 ? ['盾'] : [])];
 }
+
+// ---------------- 伸びやすさ（初期カスタム・鍛える） ----------------
+// もとの得意度が高いものほど伸びやすい（キャラらしさを崩さない）。上乗せの上限もここで決まる
+export const SKILLS = ['heal', 'song', 'guard', 'scan'];
+export const GROW_KEYS = [...WEAPONS, ...ELEMS, ...SKILLS];
+export const baseApt = (id, k) => { const C = CHARS[id]; return WEAPON[k] ? C.w[k] : ELEM[k] ? C.e[k] : C.s[k] || 0; };
+export const growWeight = (id, k) => { const b = baseApt(id, k); return b >= 7 ? 5 : b >= 5 ? 3 : b >= 3 ? 1.4 : 0.5; };
+export const growCap = (id, k) => { const b = baseApt(id, k); return b >= 5 ? 5 : b >= 3 ? 4 : 2; };
+export const growText = (id, k) => { const b = baseApt(id, k); return b >= 5 ? 'よく伸びる' : b >= 3 ? 'ふつう' : '伸びにくい'; };
+
+// ---------------- 魔王の号令 ----------------
+// cost：号令ゲージの消費。tier 0 は最初から使える。req：覚えるのに先に必要な号令。target：相手を1人選ぶ
+// passive：覚えるだけで効く（ゲージを増やす）。line：覚える画面での系統
+export const CMDS = {
+  aim_free: { name: '自由に狙え', cost: 1, tier: 0, line: 'aim', desc: 'ねらいを元に戻す（ヘイトや挑発しだい）' },
+  aim_weak: { name: '弱った子を狙え', cost: 1, tier: 0, line: 'aim', desc: '体力の減った子を優先してねらう' },
+  stance_atk: { name: '攻めろ', cost: 1, tier: 0, line: 'stance', desc: '攻撃が上がるかわりに、受けるダメージも増える' },
+  stance_def: { name: '守れ', cost: 1, tier: 0, line: 'stance', desc: '受けるダメージが減るかわりに、攻撃も下がる' },
+  stance_norm: { name: '構えを戻す', cost: 0, tier: 0, line: 'stance', desc: 'ふつうの構えに戻す' },
+  aim_healer: { name: '回復役を狙え', cost: 1, tier: 1, line: 'aim', desc: '回復が得意な子を優先してねらう' },
+  aim_pick: { name: 'この子を狙え', cost: 1, tier: 2, line: 'aim', req: 'aim_healer', target: true, desc: '選んだ1人を優先してねらう' },
+  charge: { name: 'ため', cost: 2, tier: 1, line: 'atk', desc: '1回休んで、次の一撃を約2倍にする（ためている間は守りが下がる）' },
+  trump: { name: '切り札', cost: 2, tier: 2, line: 'atk', req: 'charge', desc: '持っている特性をいま使う（全体攻撃・再生・反射・毒・怒り・飛行・貫通・見破り）' },
+  scare: { name: '威嚇', cost: 2, tier: 1, line: 'mess', target: true, desc: '1人をすくませて1回休みにする（盾が得意な子には効きにくい）' },
+  g_start: { name: '号令の準備', tier: 1, line: 'cmd', passive: true, desc: '戦いの始まりの号令ゲージ+1' },
+  g_max: { name: '号令の器', tier: 2, line: 'cmd', passive: true, req: 'g_start', desc: '号令ゲージの最大+1、たまる速さも少し上がる' },
+};
+export const CMD_START = ['aim_free', 'aim_weak', 'stance_atk', 'stance_def', 'stance_norm'];
+export const CMD_LINE = { aim: '狙い', stance: '構え', atk: '攻撃', mess: 'かく乱', cmd: '指揮' };
+// 自由行動：魔王の行動（1回）
+export const MAOU_ACTS = {
+  learn: { name: '号令を覚える', desc: '新しい号令を1つ覚える' },
+  power: { name: '力をためる', desc: '使える魔力+2' },
+  scout: { name: '偵察', desc: '2人を選んで、得意・能力・今回の育ち方をすべて見る' },
+  assassin: { name: '刺客を送る', desc: '1人の体力を大きく削って疲れ+2（そばの2人も傷を負って疲れ+1）' },
+};
+export const MAOU_POWER_ACT = 2;
+// 切り札の中身（特性ごと）
+export const TRUMP = {
+  sweep: '全体攻撃をいま放つ', regen: '体力を大きく回復する', reflect: '2回のあいだ魔法を必ず跳ね返す', poison: '全員に毒をまく',
+  rage: 'いますぐ怒り状態になる', fly: '2ターン空高く舞い、武器（弓以外）を当たりにくくする', pierce: '次の一撃で守りも盾も完全に無視する', keen: '挑発を見破り、ねらいを必ず通す（2ターン）',
+};

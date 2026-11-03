@@ -262,3 +262,78 @@ button { touch-action: manipulation; }
 /* まだモンスターがいないとき：作るボタンを目立たせる */
 .btn.make { height: 54px; font-size: 18px; border: 0; color: #2a1a00; background: linear-gradient(180deg, #ffe08a, #f2b33a); box-shadow: 0 3px 0 #a8701a, 0 0 0 0 rgba(242, 195, 90, .6); animation: makePulse 1.8s ease-out infinite; margin-top: 12px; }
 @keyframes makePulse { 0% { box-shadow: 0 3px 0 #a8701a, 0 0 0 0 rgba(242, 195, 90, .55); } 70% { box-shadow: 0 3px 0 #a8701a, 0 0 0 12px rgba(242, 195, 90, 0); } 100% { box-shadow: 0 3px 0 #a8701a, 0 0 0 0 rgba(242, 195, 90, 0); } }
+/* 号令と状態アイコン */
+.ic { width: 14px; height: 14px; vertical-align: -2px; flex: none; }
+.ic.blue { color: #8fc8ff; } .ic.gold { color: var(--gold); } .ic.red { color: #ff8a9a; } .ic.purple { color: #c08bff; }
+.sp { position: relative; }
+.sp .st { position: absolute; top: -2px; left: 0; right: 0; display: flex; justify-content: center; gap: 1px; min-height: 14px; z-index: 2; }
+.sp .st .ic { background: #120d20e6; border-radius: 7px; padding: 1px; width: 16px; height: 16px; }
+.sc-cmd { display: flex; align-items: center; gap: 8px; padding: 6px 10px; background: #1a1430; border-bottom: 1px solid var(--line); min-height: 44px; }
+.sc-cmd[hidden] { display: none; }
+.gauge-wrap { display: flex; flex-direction: column; gap: 2px; flex: none; }
+.glabel { font-size: 10px; color: var(--sub); letter-spacing: 1px; }
+.gauge { display: flex; gap: 3px; }
+.gauge i { width: 10px; height: 10px; border-radius: 3px; background: #2c2448; border: 1px solid #4a3d75; transform: rotate(45deg); margin: 2px 1px; }
+.gauge i.on { background: var(--gold); border-color: #ffe7a8; box-shadow: 0 0 6px #f2c35a88; }
+.gauge i.rsv { background: #7a5d1d; border-color: #a8802a; }
+.mstat { flex: 1; min-width: 0; display: flex; flex-wrap: wrap; gap: 4px; }
+.chip { display: inline-flex; align-items: center; gap: 3px; font-size: 11px; padding: 2px 7px 2px 5px; border-radius: 10px; background: #2a2142; color: var(--text); white-space: nowrap; }
+.chip.red { color: #ffb3bf; } .chip.blue { color: #b9dcff; } .chip.gold { color: #ffe3a0; }
+#sc-cmd-btn { flex: none; height: 34px; padding: 0 14px; font-size: 13px; max-width: 46%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+#sc-cmd-btn.queued { background: linear-gradient(180deg, #ffe08a, #f2b33a); color: #2a1a00; box-shadow: 0 3px 0 #a8701a; }
+.ev.cmd { color: #ffe3a0; font-weight: 700; border-left: 3px solid var(--gold); padding-left: 8px; }
+.cmd-list, .act-list { display: flex; flex-direction: column; gap: 6px; margin-top: 8px; }
+.cmd-opt, .act-opt, .mrow { display: grid; grid-template-columns: 1fr auto; gap: 2px 8px; text-align: left; padding: 10px 12px; border-radius: 12px; border: 1px solid var(--line); background: var(--card); color: var(--text); font-size: 14px; }
+.cmd-opt small, .act-opt small, .mrow small { grid-column: 1 / -1; color: var(--sub); font-size: 12px; font-weight: 400; }
+.cmd-opt b small { color: var(--gold); margin-left: 4px; }
+.cmd-opt:disabled, .act-opt:disabled { opacity: .4; }
+.act-opt.on { border-color: var(--gold); box-shadow: 0 0 0 1px var(--gold) inset; }
+.mrow { opacity: .45; margin: 4px 0; } .mrow.on { opacity: 1; }
+.cpips { display: inline-flex; gap: 3px; align-items: center; }
+.cpips i { width: 8px; height: 8px; background: var(--gold); transform: rotate(45deg); border-radius: 2px; }
+.pick-row { display: flex; flex-wrap: wrap; gap: 6px; margin: 6px 0 10px; }
+.pick { display: inline-flex; align-items: center; gap: 5px; padding: 4px 10px 4px 4px; border-radius: 18px; border: 1px solid var(--line); background: var(--card); color: var(--text); font-size: 13px; }
+.pick img { width: 28px; height: 28px; border-radius: 50%; border: 2px solid var(--c); object-fit: cover; }
+.pick small { color: var(--sub); font-size: 10px; margin-left: 2px; }
+.pick.on { border-color: var(--gold); background: #3a2a62; }
+.kh.small { font-size: 12px; margin: 10px 0 2px; }
+/* 自由行動の結果 */
+.free-maou { padding: 10px 12px; border-radius: 10px; background: #2a1d3e; border: 1px solid #5a3f86; font-size: 14px; line-height: 1.6; }
+.free-rows { display: flex; flex-direction: column; gap: 4px; margin-top: 6px; }
+.free-row { display: grid; grid-template-columns: 30px 70px 1fr; align-items: center; gap: 6px; font-size: 13px; padding: 4px 0; border-bottom: 1px solid #2f2650; }
+.free-row img { width: 28px; height: 28px; border-radius: 50%; border: 2px solid var(--c); object-fit: cover; }
+.free-row span { color: var(--sub); }
+/* 偵察：まだわからないところ */
+.unk { color: #6f6590 !important; }
+.ptable td.ap.unk { background: repeating-linear-gradient(45deg, #1d1733, #1d1733 4px, #221b3b 4px, #221b3b 8px); }
+.tag.unk { background: #3b3358; color: #c9bfe8; }
+.hpb { height: 4px; background: #0006; border-radius: 2px; overflow: hidden; margin: 3px auto 0; width: 80%; }
+.hpb i { display: block; height: 100%; background: var(--green); }
+/* ひと目でわかる */
+.gl-box { padding: 10px 12px; margin: 8px 0; border: 1px solid var(--line); border-radius: 12px; background: var(--card); }
+.gl-h { font-size: 12px; color: var(--sub); letter-spacing: 1px; margin-bottom: 6px; }
+.gl-row { display: grid; grid-template-columns: 22px 64px 40px 1fr; align-items: center; gap: 6px; padding: 4px 0; }
+.gl-row .rank { width: 20px; height: 20px; border-radius: 50%; background: #5a2a38; color: #ffd0d8; font-size: 12px; font-weight: 800; display: flex; align-items: center; justify-content: center; }
+.gl-row .pct { color: var(--gold); font-weight: 800; font-size: 13px; }
+.gl-row .faces { display: flex; gap: 3px; flex-wrap: wrap; justify-content: flex-end; }
+.gl-row .kp, .gl-who .kp { font-size: 11px; }
+.pm-bar { height: 10px; border-radius: 5px; background: #4a6cd0; overflow: hidden; }
+.pm-bar i { display: block; height: 100%; background: #e0715a; }
+.pm-lbl { display: flex; justify-content: space-between; font-size: 12px; margin-top: 3px; color: var(--sub); }
+.pm-lbl span:first-child { color: #ffb09f; } .pm-lbl span:last-child { color: #a9c2ff; }
+.gl-who { display: grid; grid-template-columns: 112px 1fr; align-items: center; gap: 8px; padding: 4px 0; }
+.gl-who span b { font-size: 13px; display: block; } .gl-who small { color: var(--sub); font-size: 11px; }
+.gl-mem { display: grid; grid-template-columns: 30px 82px 1fr; align-items: center; gap: 6px; padding: 5px 0; border-bottom: 1px solid #2f2650; cursor: pointer; }
+.gl-mem.off { opacity: .45; }
+.gl-mem > img { width: 28px; height: 28px; border-radius: 50%; border: 2px solid var(--c); object-fit: cover; }
+.gl-mem .nm { font-size: 13px; font-weight: 700; line-height: 1.2; }
+.gl-mem .nm small { display: block; font-size: 10px; color: var(--sub); font-weight: 400; }
+.gl-mem .hpb { margin: 2px 0 0; width: 100%; }
+.gl-mem .tops { display: flex; gap: 3px; flex-wrap: wrap; justify-content: flex-end; }
+.gl-mem .t { font-size: 11px; padding: 2px 6px; border-radius: 9px; background: #1a1430; color: var(--sub); white-space: nowrap; }
+.gl-mem .t b { margin-left: 3px; color: var(--text); }
+.gl-mem .t.hi { background: #3a2a62; color: var(--text); } .gl-mem .t.hi b { color: var(--gold); }
+.seg.pview button { font-size: 12px; }
+.free-grp { padding: 8px 0; border-bottom: 1px solid #2f2650; }
+.fg-h { font-size: 13px; color: var(--sub); margin-bottom: 5px; }
+.fg-faces { display: flex; flex-wrap: wrap; gap: 4px; }

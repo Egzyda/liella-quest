@@ -9,10 +9,10 @@
 <meta name="apple-mobile-web-app-title" content="リエラクエスト">
 <title>リエラクエスト</title>
 <link rel="manifest" href="manifest.json">
-<link rel="icon" href="img/icon-192.png?v=2026.11.03-20">
-<link rel="apple-touch-icon" href="img/icon-180.png?v=2026.11.03-20">
+<link rel="icon" href="img/icon-192.png?v=2026.11.03-23">
+<link rel="apple-touch-icon" href="img/icon-180.png?v=2026.11.03-23">
 <link href="https://fonts.googleapis.com/css2?family=DotGothic16&family=M+PLUS+Rounded+1c:wght@400;700;800&display=swap" rel="stylesheet" media="print" onload="this.media='all'">
-<link rel="stylesheet" href="style.css?v=2026.11.03-20">
+<link rel="stylesheet" href="style.css?v=2026.11.03-23">
 </head>
 <body>
 <div id="boot">読み込み中…</div>
@@ -49,10 +49,11 @@
   <div class="scroll">
     <div id="progress" class="progress"></div>
     <div id="next-card" class="card"></div>
-    <div class="tabs"><button data-tab="party" class="on">パーティー</button><button data-tab="book">図鑑</button><button data-tab="log">記録</button></div>
+    <div class="tabs"><button data-tab="party" class="on">パーティー</button><button data-tab="book">図鑑</button><button data-tab="log">記録</button><button data-tab="maou">魔王</button></div>
     <div id="tab-party" class="tab"></div>
     <div id="tab-book" class="tab" hidden></div>
     <div id="tab-log" class="tab" hidden></div>
+    <div id="tab-maou" class="tab" hidden></div>
   </div>
 </section>
 
@@ -91,6 +92,11 @@
     <button id="sc-pause" class="icon-btn sc-ib sc-pause" aria-label="一時停止">Ⅱ</button>
     <div id="sc-paused" class="sc-paused" hidden>一時停止中</div>
   </div>
+  <div class="sc-cmd" id="sc-cmd">
+    <div class="gauge-wrap"><span class="glabel">号令</span><div id="sc-gauge" class="gauge"></div></div>
+    <div id="sc-mstat" class="mstat"></div>
+    <button id="sc-cmd-btn" class="btn small primary">号令</button>
+  </div>
   <div id="sc-log" class="sc-log"></div>
   <div id="sc-party" class="sc-party"></div>
   <div class="sc-ctrl">
@@ -104,6 +110,6 @@
 <div id="sheet" class="sheet" hidden><div class="sheet-body"><button id="sheet-close" class="icon-btn sheet-x">×</button><div id="sheet-content"></div></div></div>
 <div id="toast" class="toast"></div>
 
-<script type="module" src="js/main.js?v=2026.11.03-20"></script>
+<script type="module" src="js/main.js?v=2026.11.03-23"></script>
 </body>
 </html>
